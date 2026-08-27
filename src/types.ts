@@ -23,6 +23,7 @@ export interface Project {
     label: string;
     value: string;
   }[];
+  deletedAt?: number; // Timestamp when deleted (null means not deleted)
 }
 
 export interface Skill {

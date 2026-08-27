@@ -1,7 +1,7 @@
 import React from 'react';
 import { Code2, Smartphone, Sparkles } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import thaboPortrait from '../../assets/images/thabo_portrait_1787138003397.jpg';
+import thaboPortrait from '../../assets/images/thabo_portrait.jpg';
 
 interface AboutProps {
   onOpenResume?: () => void;

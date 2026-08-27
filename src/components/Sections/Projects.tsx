@@ -3,7 +3,7 @@ import { projectsData } from '../../data/projects';
 import { Project } from '../../types';
 import { ProjectDetailModal } from '../UI/ProjectDetailModal';
 import { AddProjectModal } from '../UI/AddProjectModal';
-import { ExternalLink, Github, ArrowUpRight, ChevronLeft, ChevronRight, Plus, Trash2, RotateCcw, AlertTriangle, X, Check } from 'lucide-react';
+import { ExternalLink, Github, ArrowUpRight, ChevronLeft, ChevronRight, Plus, Trash2, RotateCcw, AlertTriangle, X, Check, Trash } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 const LOCAL_STORAGE_KEY = 'thabo_portfolio_all_projects_v2';
@@ -13,10 +13,11 @@ export const Projects: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
-  const [lastDeletedProject, setLastDeletedProject] = useState<Project | null>(null);
+  const [projectToPermanentlyDelete, setProjectToPermanentlyDelete] = useState<Project | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [showTrash, setShowTrash] = useState(false);
 
   // Load custom/active projects from localStorage or default to projectsData
   const [allProjects, setAllProjects] = useState<Project[]>(() => {
@@ -74,19 +75,21 @@ export const Projects: React.FC = () => {
     setProjectToDelete(project);
   };
 
+  // Soft delete - move to trash
   const handleConfirmRemove = () => {
     if (!projectToDelete) return;
     playSound('pop');
     const target = projectToDelete;
     
     setAllProjects(prev => {
-      const updated = prev.filter(p => p.id !== target.id);
+      const updated = prev.map(p =>
+        p.id === target.id ? { ...p, deletedAt: Date.now() } : p
+      );
       saveProjectsToStorage(updated);
       return updated;
     });
 
-    setLastDeletedProject(target);
-    setToastMessage(`Removed "${target.title}".`);
+    setToastMessage(`Moved "${target.title}" to trash.`);
     setProjectToDelete(null);
 
     if (selectedProject?.id === target.id) {
@@ -98,16 +101,34 @@ export const Projects: React.FC = () => {
     }, 6000);
   };
 
-  const handleUndoDelete = () => {
-    if (!lastDeletedProject) return;
+  // Restore from trash
+  const handleRestoreProject = (project: Project) => {
     playSound('pop');
     setAllProjects(prev => {
-      const updated = [...prev, lastDeletedProject];
+      const updated = prev.map(p =>
+        p.id === project.id ? { ...p, deletedAt: undefined } : p
+      );
       saveProjectsToStorage(updated);
       return updated;
     });
-    setToastMessage(`Restored "${lastDeletedProject.title}".`);
-    setLastDeletedProject(null);
+    setToastMessage(`Restored "${project.title}".`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Permanently delete from trash
+  const handlePermanentlyDelete = () => {
+    if (!projectToPermanentlyDelete) return;
+    playSound('pop');
+    const target = projectToPermanentlyDelete;
+    
+    setAllProjects(prev => {
+      const updated = prev.filter(p => p.id !== target.id);
+      saveProjectsToStorage(updated);
+      return updated;
+    });
+
+    setToastMessage(`Permanently deleted "${target.title}".`);
+    setProjectToPermanentlyDelete(null);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -123,9 +144,14 @@ export const Projects: React.FC = () => {
 
   const categories = ['All', 'AI & Fullstack', 'E-commerce', 'Cloud & DevOps', 'Real Estate', 'Clean Energy', 'Digital Experience'];
 
+  // Active projects (not deleted)
+  const activeProjects = allProjects.filter(p => !p.deletedAt);
+  // Deleted projects (in trash)
+  const deletedProjects = allProjects.filter(p => p.deletedAt);
+
   const filteredProjects = activeCategory === 'All'
-    ? allProjects
-    : allProjects.filter(p => p.category === activeCategory);
+    ? activeProjects
+    : activeProjects.filter(p => p.category === activeCategory);
 
   const scroll = (direction: 'left' | 'right') => {
     playSound('click');
@@ -153,8 +179,187 @@ export const Projects: React.FC = () => {
     setActiveIndex(Math.max(0, index));
   };
 
-  const isModifiedFromDefaults = allProjects.length !== projectsData.length ||
-    !projectsData.every(dp => allProjects.some(p => p.id === dp.id));
+  const isModifiedFromDefaults = activeProjects.length !== projectsData.length ||
+    !projectsData.every(dp => activeProjects.some(p => p.id === dp.id));
+
+  if (showTrash) {
+    // TRASH/BIN VIEW
+    return (
+      <section
+        id="projects-trash"
+        aria-label="Projects trash"
+        className="relative py-28 sm:py-36 bg-[#000000] text-white border-t border-[#1F1F1F] overflow-hidden text-left"
+      >
+        <div className="absolute top-1/3 right-0 w-96 h-96 bg-[#1F1F1F]/20 rounded-full blur-[140px] pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-left">
+          {/* Section Header */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 sm:mb-16 gap-6 text-left">
+            <div className="space-y-3 text-left">
+              <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A1A1AA] text-left">
+                <span className="w-4 h-0.5 bg-[#71717A]" />
+                <span>TRASH BIN</span>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white uppercase leading-[0.95] text-left">
+                DELETED PROJECTS
+              </h2>
+
+              <p className="text-xs sm:text-sm md:text-base text-[#A1A1AA] max-w-xl font-normal leading-relaxed pt-1 text-left">
+                Projects in the trash can be restored or permanently deleted.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowTrash(false)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0C0C0C] hover:bg-[#18181B] text-white border border-[#1F1F1F] hover:border-[#3F3F46] text-xs font-bold uppercase tracking-wider transition-all"
+            >
+              ← Back to Projects
+            </button>
+          </div>
+
+          {deletedProjects.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-[#0C0C0C] border border-[#1F1F1F] space-y-4 my-8">
+              <Trash className="w-12 h-12 mx-auto text-[#71717A]" />
+              <p className="text-[#A1A1AA] text-sm">Trash is empty</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {deletedProjects.map(project => (
+                <div
+                  key={project.id}
+                  className="rounded-xl bg-[#0C0C0C]/90 border border-red-900/50 shadow-[0_6px_25px_rgb(0,0,0,0.8)] overflow-hidden group text-left"
+                >
+                  {/* Image */}
+                  <div className="relative h-40 w-full overflow-hidden bg-[#000000]">
+                    <img
+                      src={project.image}
+                      alt={project.title}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover object-center opacity-50 group-hover:opacity-70 transition-opacity"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0C0C0C] via-transparent to-transparent" />
+                    <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-red-950/85 text-red-400 border border-red-800">
+                      DELETED
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-4 space-y-3">
+                    <div>
+                      <h3 className="font-serif font-bold text-base sm:text-lg text-white uppercase line-clamp-1">
+                        {project.title}
+                      </h3>
+                      <p className="text-xs text-[#71717A] mt-1">
+                        {project.category}
+                      </p>
+                    </div>
+
+                    {/* Deleted Date */}
+                    {project.deletedAt && (
+                      <p className="text-xs text-[#71717A]">
+                        Deleted: {new Date(project.deletedAt).toLocaleDateString()}
+                      </p>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="pt-3 border-t border-[#1F1F1F] flex gap-2">
+                      <button
+                        onClick={() => handleRestoreProject(project)}
+                        className="flex-1 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider transition-all"
+                      >
+                        Restore
+                      </button>
+                      <button
+                        onClick={() => setProjectToPermanentlyDelete(project)}
+                        className="flex-1 px-3 py-2 rounded-lg bg-red-950 hover:bg-red-900 text-red-400 border border-red-800 text-xs font-semibold uppercase tracking-wider transition-all"
+                      >
+                        Delete Forever
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Permanent Delete Confirmation Modal */}
+        {projectToPermanentlyDelete && (
+          <div
+            id="permanent-delete-modal-overlay"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+            onClick={() => setProjectToPermanentlyDelete(null)}
+          >
+            <div
+              id="permanent-delete-modal-card"
+              className="w-full max-w-md bg-[#0C0C0C] border border-red-900 rounded-2xl p-6 shadow-2xl text-left space-y-4 text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-red-950/60 border border-red-800 text-red-400">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold uppercase tracking-tight text-white">
+                      Permanently Delete
+                    </h3>
+                    <p className="text-xs text-[#71717A]">
+                      This action cannot be undone
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setProjectToPermanentlyDelete(null)}
+                  className="p-1 rounded-lg text-[#71717A] hover:text-white hover:bg-[#18181B] transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed">
+                Are you sure you want to permanently delete <strong className="text-white font-semibold">"{projectToPermanentlyDelete.title}"</strong>? This cannot be recovered.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => setProjectToPermanentlyDelete(null)}
+                  className="px-4 py-2 rounded-xl bg-[#18181B] hover:bg-[#27272A] text-white text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  id="btn-confirm-permanent-delete"
+                  onClick={handlePermanentlyDelete}
+                  className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Forever</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Toast */}
+        {toastMessage && (
+          <div
+            id="trash-action-toast"
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#0C0C0C] border border-[#27272A] shadow-2xl text-white text-xs animate-in slide-in-from-bottom-3 duration-200"
+          >
+            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  // MAIN PROJECTS VIEW
 
   return (
     <section
@@ -202,6 +407,25 @@ export const Projects: React.FC = () => {
               <span>Add Project</span>
             </button>
 
+            {/* Trash Button - Show if there are deleted projects */}
+            {deletedProjects.length > 0 && (
+              <button
+                id="btn-view-trash"
+                onClick={() => {
+                  playSound('pop');
+                  setShowTrash(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-red-950/80 hover:bg-red-900 text-red-400 hover:text-red-300 border border-red-800 hover:border-red-700 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer relative"
+                title={`View ${deletedProjects.length} project(s) in trash`}
+              >
+                <Trash className="w-3 h-3" />
+                <span>Trash</span>
+                <span className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  {deletedProjects.length}
+                </span>
+              </button>
+            )}
+
             {/* Restore Defaults Button (visible if projects were removed or altered) */}
             {isModifiedFromDefaults && (
               <button
@@ -247,7 +471,7 @@ export const Projects: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 mb-6 pb-2 border-b border-[#1F1F1F]">
           {categories.map(cat => {
             const isActive = activeCategory === cat;
-            const count = cat === 'All' ? allProjects.length : allProjects.filter(p => p.category === cat).length;
+            const count = cat === 'All' ? activeProjects.length : activeProjects.filter(p => p.category === cat).length;
             return (
               <button
                 key={cat}
@@ -418,7 +642,7 @@ export const Projects: React.FC = () => {
         )}
       </div>
 
-      {/* Confirmation Modal for Project Deletion */}
+      {/* Confirmation Modal for Project Deletion (Move to Trash) */}
       {projectToDelete && (
         <div
           id="delete-project-modal-overlay"
@@ -437,7 +661,7 @@ export const Projects: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-bold uppercase tracking-tight text-white">
-                    Remove Project
+                    Move to Trash
                   </h3>
                   <p className="text-xs text-[#71717A]">
                     Portfolio Showcase Management
@@ -454,7 +678,7 @@ export const Projects: React.FC = () => {
             </div>
 
             <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed">
-              Are you sure you want to remove <strong className="text-white font-semibold">"{projectToDelete.title}"</strong> from your projects section?
+              Move <strong className="text-white font-semibold">"{projectToDelete.title}"</strong> to trash? You can restore it later from the trash bin.
             </p>
 
             <div className="pt-2 flex items-center justify-end gap-2.5">
@@ -471,14 +695,14 @@ export const Projects: React.FC = () => {
                 className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Remove Project</span>
+                <span>Move to Trash</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Floating Toast with Undo Action */}
+      {/* Floating Toast with Action */}
       {toastMessage && (
         <div
           id="project-action-toast"
@@ -486,14 +710,6 @@ export const Projects: React.FC = () => {
         >
           <div className="w-2 h-2 rounded-full bg-emerald-400" />
           <span>{toastMessage}</span>
-          {lastDeletedProject && (
-            <button
-              onClick={handleUndoDelete}
-              className="ml-2 px-2 py-0.5 rounded bg-white text-black font-bold uppercase text-[10px] hover:bg-[#A1A1AA] transition-colors cursor-pointer"
-            >
-              Undo
-            </button>
-          )}
         </div>
       )}
 
