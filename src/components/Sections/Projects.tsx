@@ -1,9 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { projectsData } from '../../data/projects';
+import React, { useState, useRef, useEffect } from 'react';
 import { Project } from '../../types';
 import { ProjectDetailModal } from '../UI/ProjectDetailModal';
 import { AddProjectModal } from '../UI/AddProjectModal';
-import { ExternalLink, Github, ArrowUpRight, ChevronLeft, ChevronRight, Plus, Trash2, RotateCcw, AlertTriangle, X, Check, Trash } from 'lucide-react';
+import { ExternalLink, Github, ArrowUpRight, ChevronLeft, ChevronRight, Plus, Trash2, AlertTriangle, X, Check, Trash, MoreVertical, CheckSquare } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 const LOCAL_STORAGE_KEY = 'thabo_portfolio_all_projects_v2';
@@ -12,14 +11,36 @@ export const Projects: React.FC = () => {
   const { playSound } = useTheme();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
-  const [projectToPermanentlyDelete, setProjectToPermanentlyDelete] = useState<Project | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<Project[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [showTrash, setShowTrash] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const pendingCardClickRef = useRef<number | null>(null);
 
-  // Load custom/active projects from localStorage or default to projectsData
+  // Close the "⋯" more menu on outside click or Escape
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMoreMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMoreMenuOpen]);
+
+  // Safe-initialize with only user-added projects; start empty if nothing saved
   const [allProjects, setAllProjects] = useState<Project[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -32,7 +53,7 @@ export const Projects: React.FC = () => {
     } catch (e) {
       console.warn('Could not load projects from localStorage', e);
     }
-    return projectsData;
+    return [];
   });
 
   const saveProjectsToStorage = (projects: Project[]) => {
@@ -72,82 +93,88 @@ export const Projects: React.FC = () => {
   const handlePromptDelete = (e: React.MouseEvent, project: Project) => {
     e.stopPropagation();
     playSound('pop');
-    setProjectToDelete(project);
+    setProjectToDelete([project]);
   };
 
-  // Soft delete - move to trash
-  const handleConfirmRemove = () => {
-    if (!projectToDelete) return;
+
+// Permanently delete the project(s) pending confirmation
+  const handleConfirmDelete = () => {
+    if (projectToDelete.length === 0) return;
     playSound('pop');
-    const target = projectToDelete;
-    
+    const targets = projectToDelete;
+    const targetIds = new Set(targets.map(t => t.id));
+
     setAllProjects(prev => {
-      const updated = prev.map(p =>
-        p.id === target.id ? { ...p, deletedAt: Date.now() } : p
-      );
+      const updated = prev.filter(p => !targetIds.has(p.id));
       saveProjectsToStorage(updated);
       return updated;
     });
 
-    setToastMessage(`Moved "${target.title}" to trash.`);
-    setProjectToDelete(null);
+    setToastMessage(
+      targets.length === 1
+        ? `Deleted "${targets[0].title}".`
+        : `Deleted ${targets.length} projects.`
+    );
+    setProjectToDelete([]);
+    clearSelection();
 
-    if (selectedProject?.id === target.id) {
+    if (selectedProject && targetIds.has(selectedProject.id)) {
       setSelectedProject(null);
     }
 
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 6000);
+    setTimeout(() => setToastMessage(null), 4500);
   };
 
-  // Restore from trash
-  const handleRestoreProject = (project: Project) => {
-    playSound('pop');
-    setAllProjects(prev => {
-      const updated = prev.map(p =>
-        p.id === project.id ? { ...p, deletedAt: undefined } : p
-      );
-      saveProjectsToStorage(updated);
-      return updated;
+  // ---- Selection mode (triggered by double-tap) ----
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      setSelectionMode(next.length > 0);
+      return next;
     });
-    setToastMessage(`Restored "${project.title}".`);
-    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Permanently delete from trash
-  const handlePermanentlyDelete = () => {
-    if (!projectToPermanentlyDelete) return;
+  const clearSelection = () => {
+    setSelectedIds([]);
+    setSelectionMode(false);
+  };
+
+  // Single tap opens the case study (brief delay allows double-tap detection);
+  // double tap toggles a project's selection.
+  const handleCardClick = (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    const target = e.target as HTMLElement;
+    if (target.closest('a, button, input')) return;
+
+    if (selectionMode) {
+      toggleSelect(project.id);
+      return;
+    }
+
+    if (pendingCardClickRef.current) {
+      window.clearTimeout(pendingCardClickRef.current);
+      pendingCardClickRef.current = null;
+      toggleSelect(project.id);
+    } else {
+      pendingCardClickRef.current = window.setTimeout(() => {
+        pendingCardClickRef.current = null;
+        handleOpenDetail(project);
+      }, 260);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
     playSound('pop');
-    const target = projectToPermanentlyDelete;
-    
-    setAllProjects(prev => {
-      const updated = prev.filter(p => p.id !== target.id);
-      saveProjectsToStorage(updated);
-      return updated;
-    });
-
-    setToastMessage(`Permanently deleted "${target.title}".`);
-    setProjectToPermanentlyDelete(null);
-    setTimeout(() => setToastMessage(null), 3000);
+    const targets = allProjects.filter(p => selectedIds.includes(p.id));
+    setProjectToDelete(targets);
   };
-
-  const handleRestoreDefaults = () => {
-    playSound('pop');
-    setAllProjects(projectsData);
-    saveProjectsToStorage(projectsData);
-    setToastMessage('Restored all default projects.');
-    setTimeout(() => setToastMessage(null), 3000);
-  };
-
   const [activeCategory, setActiveCategory] = useState<string>('All');
 
   const categories = ['All', 'AI & Fullstack', 'E-commerce', 'Cloud & DevOps', 'Real Estate', 'Clean Energy', 'Digital Experience'];
 
-  // Active projects (not deleted)
-  const activeProjects = allProjects.filter(p => !p.deletedAt);
-  // Deleted projects (in trash)
-  const deletedProjects = allProjects.filter(p => p.deletedAt);
+  // Only user-added projects are shown (the preloaded "fixed" defaults are removed)
+  const activeProjects = allProjects;
 
   const filteredProjects = activeCategory === 'All'
     ? activeProjects
@@ -178,186 +205,6 @@ export const Projects: React.FC = () => {
     );
     setActiveIndex(Math.max(0, index));
   };
-
-  const isModifiedFromDefaults = activeProjects.length !== projectsData.length ||
-    !projectsData.every(dp => activeProjects.some(p => p.id === dp.id));
-
-  if (showTrash) {
-    // TRASH/BIN VIEW
-    return (
-      <section
-        id="projects-trash"
-        aria-label="Projects trash"
-        className="relative py-28 sm:py-36 bg-[#000000] text-white border-t border-[#1F1F1F] overflow-hidden text-left"
-      >
-        <div className="absolute top-1/3 right-0 w-96 h-96 bg-[#1F1F1F]/20 rounded-full blur-[140px] pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-left">
-          {/* Section Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 sm:mb-16 gap-6 text-left">
-            <div className="space-y-3 text-left">
-              <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A1A1AA] text-left">
-                <span className="w-4 h-0.5 bg-[#71717A]" />
-                <span>TRASH BIN</span>
-              </div>
-
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white uppercase leading-[0.95] text-left">
-                DELETED PROJECTS
-              </h2>
-
-              <p className="text-xs sm:text-sm md:text-base text-[#A1A1AA] max-w-xl font-normal leading-relaxed pt-1 text-left">
-                Projects in the trash can be restored or permanently deleted.
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowTrash(false)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0C0C0C] hover:bg-[#18181B] text-white border border-[#1F1F1F] hover:border-[#3F3F46] text-xs font-bold uppercase tracking-wider transition-all"
-            >
-              ← Back to Projects
-            </button>
-          </div>
-
-          {deletedProjects.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl bg-[#0C0C0C] border border-[#1F1F1F] space-y-4 my-8">
-              <Trash className="w-12 h-12 mx-auto text-[#71717A]" />
-              <p className="text-[#A1A1AA] text-sm">Trash is empty</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {deletedProjects.map(project => (
-                <div
-                  key={project.id}
-                  className="rounded-xl bg-[#0C0C0C]/90 border border-red-900/50 shadow-[0_6px_25px_rgb(0,0,0,0.8)] overflow-hidden group text-left"
-                >
-                  {/* Image */}
-                  <div className="relative h-40 w-full overflow-hidden bg-[#000000]">
-                    <img
-                      src={project.image}
-                      alt={project.title}
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover object-center opacity-50 group-hover:opacity-70 transition-opacity"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0C0C0C] via-transparent to-transparent" />
-                    <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-red-950/85 text-red-400 border border-red-800">
-                      DELETED
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-4 space-y-3">
-                    <div>
-                      <h3 className="font-serif font-bold text-base sm:text-lg text-white uppercase line-clamp-1">
-                        {project.title}
-                      </h3>
-                      <p className="text-xs text-[#71717A] mt-1">
-                        {project.category}
-                      </p>
-                    </div>
-
-                    {/* Deleted Date */}
-                    {project.deletedAt && (
-                      <p className="text-xs text-[#71717A]">
-                        Deleted: {new Date(project.deletedAt).toLocaleDateString()}
-                      </p>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="pt-3 border-t border-[#1F1F1F] flex gap-2">
-                      <button
-                        onClick={() => handleRestoreProject(project)}
-                        className="flex-1 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider transition-all"
-                      >
-                        Restore
-                      </button>
-                      <button
-                        onClick={() => setProjectToPermanentlyDelete(project)}
-                        className="flex-1 px-3 py-2 rounded-lg bg-red-950 hover:bg-red-900 text-red-400 border border-red-800 text-xs font-semibold uppercase tracking-wider transition-all"
-                      >
-                        Delete Forever
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Permanent Delete Confirmation Modal */}
-        {projectToPermanentlyDelete && (
-          <div
-            id="permanent-delete-modal-overlay"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-            onClick={() => setProjectToPermanentlyDelete(null)}
-          >
-            <div
-              id="permanent-delete-modal-card"
-              className="w-full max-w-md bg-[#0C0C0C] border border-red-900 rounded-2xl p-6 shadow-2xl text-left space-y-4 text-white"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-red-950/60 border border-red-800 text-red-400">
-                    <AlertTriangle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold uppercase tracking-tight text-white">
-                      Permanently Delete
-                    </h3>
-                    <p className="text-xs text-[#71717A]">
-                      This action cannot be undone
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setProjectToPermanentlyDelete(null)}
-                  className="p-1 rounded-lg text-[#71717A] hover:text-white hover:bg-[#18181B] transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed">
-                Are you sure you want to permanently delete <strong className="text-white font-semibold">"{projectToPermanentlyDelete.title}"</strong>? This cannot be recovered.
-              </p>
-
-              <div className="pt-2 flex items-center justify-end gap-2.5">
-                <button
-                  onClick={() => setProjectToPermanentlyDelete(null)}
-                  className="px-4 py-2 rounded-xl bg-[#18181B] hover:bg-[#27272A] text-white text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  id="btn-confirm-permanent-delete"
-                  onClick={handlePermanentlyDelete}
-                  className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-1.5"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete Forever</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Toast */}
-        {toastMessage && (
-          <div
-            id="trash-action-toast"
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#0C0C0C] border border-[#27272A] shadow-2xl text-white text-xs animate-in slide-in-from-bottom-3 duration-200"
-          >
-            <div className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-      </section>
-    );
-  }
 
   // MAIN PROJECTS VIEW
 
@@ -391,53 +238,91 @@ export const Projects: React.FC = () => {
             </p>
           </div>
 
-          {/* Gallery Navigation Controls, Add Project Button & Counter */}
+          {/* Gallery Navigation Controls & Actions */}
           <div className="flex flex-wrap items-center gap-3 text-left shrink-0">
-            {/* Add Project Button */}
-            <button
-              id="btn-open-add-project"
-              onClick={() => {
-                playSound('pop');
-                setIsAddModalOpen(true);
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white hover:bg-[#A1A1AA] text-black text-xs font-bold uppercase tracking-wider transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95 cursor-pointer"
-              title="Add a new project to your live showcase"
-            >
-              <Plus className="w-3.5 h-3.5 text-black" />
-              <span>Add Project</span>
-            </button>
-
-            {/* Trash Button - Show if there are deleted projects */}
-            {deletedProjects.length > 0 && (
+            {/* "⋯" More Menu - houses Add Project, Trash & Reset Defaults */}
+            <div className="relative" ref={moreMenuRef}>
               <button
-                id="btn-view-trash"
+                id="btn-open-project-more-menu"
                 onClick={() => {
                   playSound('pop');
-                  setShowTrash(true);
+                  setIsMoreMenuOpen(prev => !prev);
                 }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-red-950/80 hover:bg-red-900 text-red-400 hover:text-red-300 border border-red-800 hover:border-red-700 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer relative"
-                title={`View ${deletedProjects.length} project(s) in trash`}
+                aria-expanded={isMoreMenuOpen}
+                aria-label="Project management options"
+                className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-[#0C0C0C] hover:bg-[#18181B] text-white border border-[#1F1F1F] hover:border-[#3F3F46] transition-all cursor-pointer"
+                title="Project options"
               >
-                <Trash className="w-3 h-3" />
-                <span>Trash</span>
-                <span className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                  {deletedProjects.length}
-                </span>
+                <MoreVertical className="w-4 h-4" />
               </button>
-            )}
 
-            {/* Restore Defaults Button (visible if projects were removed or altered) */}
-            {isModifiedFromDefaults && (
-              <button
-                id="btn-restore-default-projects"
-                onClick={handleRestoreDefaults}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#0C0C0C] hover:bg-[#18181B] text-[#A1A1AA] hover:text-white border border-[#1F1F1F] hover:border-[#3F3F46] text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer"
-                title="Restore all default portfolio projects"
-              >
-                <RotateCcw className="w-3 h-3 text-[#A1A1AA]" />
-                <span>Reset Defaults</span>
-              </button>
-            )}
+              {isMoreMenuOpen && (
+                <div
+                  id="project-more-menu"
+                  role="menu"
+                  className="absolute right-0 mt-2 w-56 rounded-xl bg-[#0C0C0C] border border-[#27272A] shadow-2xl overflow-hidden z-30 animate-in fade-in zoom-in-95 duration-100"
+                >
+                  {/* Add Project */}
+                  <button
+                    id="btn-open-add-project"
+                    role="menuitem"
+                    onClick={() => {
+                      playSound('pop');
+                      setIsMoreMenuOpen(false);
+                      setIsAddModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left bg-white hover:bg-[#A1A1AA] text-black text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                    title="Add a new project to your live showcase"
+                  >
+                    <Plus className="w-4 h-4 text-black" />
+                    <span>Add Project</span>
+                  </button>
+
+                  {/* Select Projects (enter/exit selection mode via double-tap) */}
+                  <button
+                    id="btn-select-projects"
+                    role="menuitem"
+                    onClick={() => {
+                      playSound('pop');
+                      setIsMoreMenuOpen(false);
+                      if (selectionMode) {
+                        clearSelection();
+                      } else {
+                        setSelectionMode(true);
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-[#A1A1AA] hover:text-white hover:bg-[#18181B] text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer border-t border-[#1F1F1F]"
+                    title="Double-tap a project card to select or deselect it"
+                  >
+                    <CheckSquare className="w-4 h-4" />
+                    <span>{selectionMode ? 'Done Selecting' : 'Select Projects'}</span>
+                  </button>
+
+                  {/* Delete Selected (permanent) */}
+                  {selectedIds.length > 0 && (
+                    <button
+                      id="btn-delete-selected-projects"
+                      role="menuitem"
+                      onClick={() => {
+                        playSound('pop');
+                        setIsMoreMenuOpen(false);
+                        handleDeleteSelected();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-400 hover:text-red-300 hover:bg-red-950/60 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer border-t border-[#1F1F1F]"
+                      title={`Permanently delete ${selectedIds.length} selected project(s)`}
+                    >
+                      <Trash className="w-4 h-4" />
+                      <span className="flex items-center gap-2">
+                        Delete Selected
+                        <span className="flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                          {selectedIds.length}
+                        </span>
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="text-xs font-mono text-[#A1A1AA] tracking-widest uppercase bg-[#0C0C0C] px-3.5 py-2 rounded-full border border-[#1F1F1F]">
               <span className="text-white font-bold">{String(activeIndex + 1).padStart(2, '0')}</span> / {String(filteredProjects.length).padStart(2, '0')} • SCROLL →
@@ -495,10 +380,46 @@ export const Projects: React.FC = () => {
           })}
         </div>
 
-        {/* Empty state if all projects in category or overall are deleted */}
+{/* Selection banner (select multiple projects, then delete) */}
+        {selectedIds.length > 0 && (
+          <div
+            id="project-selection-bar"
+            className="flex flex-wrap items-center justify-between gap-3 mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-emerald-100"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider">
+              Selection mode — tap a project card to select • {selectedIds.length} selected
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                id="btn-selection-delete"
+                onClick={() => {
+                  playSound('click');
+                  handleDeleteSelected();
+                }}
+                disabled={selectedIds.length === 0}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Selected</span>
+              </button>
+              <button
+                id="btn-selection-done"
+                onClick={() => {
+                  playSound('pop');
+                  clearSelection();
+                }}
+                className="px-3.5 py-2 rounded-xl bg-[#18181B] hover:bg-[#27272A] text-white text-xs font-semibold uppercase tracking-wider transition-all border border-[#27272A] cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Empty state when there are no projects yet */}
         {filteredProjects.length === 0 ? (
           <div className="p-12 text-center rounded-2xl bg-[#0C0C0C] border border-[#1F1F1F] space-y-4 my-8">
-            <p className="text-[#A1A1AA] text-sm">No projects found in this category.</p>
+            <p className="text-[#A1A1AA] text-sm">No projects yet. Add your first project to showcase your work.</p>
             <div className="flex justify-center gap-3">
               {activeCategory !== 'All' && (
                 <button
@@ -509,10 +430,13 @@ export const Projects: React.FC = () => {
                 </button>
               )}
               <button
-                onClick={handleRestoreDefaults}
+                onClick={() => {
+                  playSound('pop');
+                  setIsAddModalOpen(true);
+                }}
                 className="px-4 py-2 rounded-xl bg-white text-black text-xs font-bold uppercase tracking-wider hover:bg-[#A1A1AA] transition-all cursor-pointer"
               >
-                Restore Default Projects
+                Add Your First Project
               </button>
             </div>
           </div>
@@ -524,12 +448,30 @@ export const Projects: React.FC = () => {
             className="grid grid-rows-2 grid-flow-col auto-cols-[280px] sm:auto-cols-[320px] md:auto-cols-[340px] gap-4 overflow-x-auto pb-6 scrollbar-none snap-x snap-mandatory scroll-smooth text-left"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
-            {filteredProjects.map((project) => (
+            {filteredProjects.map((project) => {
+              const isSelected = selectedIds.includes(project.id);
+              return (
               <div
                 key={project.id}
                 id={`project-card-${project.id}`}
-                className="w-[280px] sm:w-[320px] md:auto-cols-[340px] h-full shrink-0 snap-start flex flex-col justify-between rounded-xl bg-[#0C0C0C]/90 backdrop-blur-xl border border-[#1F1F1F] hover:border-[#3F3F46] shadow-[0_6px_25px_rgb(0,0,0,0.8)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_12px_35px_rgb(0,0,0,0.9)] group text-left overflow-hidden relative"
+                onClick={(e) => handleCardClick(e, project)}
+                className={`w-[280px] sm:w-[320px] md:auto-cols-[340px] h-full shrink-0 snap-start flex flex-col justify-between rounded-xl bg-[#0C0C0C]/90 backdrop-blur-xl border ${
+                  isSelected
+                    ? 'border-emerald-400 ring-2 ring-emerald-400/40'
+                    : 'border-[#1F1F1F] hover:border-[#3F3F46]'
+                } shadow-[0_6px_25px_rgb(0,0,0,0.8)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_12px_35px_rgb(0,0,0,0.9)] cursor-pointer group text-left overflow-hidden relative`}
               >
+                {/* Selection checkbox indicator (always visible) */}
+                <div
+                  className={`absolute top-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-6 h-6 rounded-full border-2 shadow-md pointer-events-none transition-all ${
+                    isSelected
+                      ? 'bg-emerald-500 border-emerald-300 text-black'
+                      : 'bg-black/75 border-white/60 text-white'
+                  }`}
+                >
+                  {isSelected ? <Check className="w-3.5 h-3.5" /> : <CheckSquare className="w-3 h-3 opacity-80" />}
+                </div>
+
                 {/* Card Image Banner - Compact */}
                 <div className="relative h-28 sm:h-32 w-full overflow-hidden bg-[#000000]">
                   <img
@@ -551,6 +493,26 @@ export const Projects: React.FC = () => {
                       <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#000000]/85 backdrop-blur-md text-white border border-[#1F1F1F]">
                         {project.category}
                       </span>
+
+                      {/* Select Project Button (toggle selection) */}
+                      <button
+                        id={`btn-select-project-${project.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playSound('click');
+                          toggleSelect(project.id);
+                        }}
+                        className={`p-1 rounded-md border transition-all cursor-pointer shadow-sm ${
+                          isSelected
+                            ? 'bg-emerald-500 hover:bg-emerald-400 border-emerald-300 text-black'
+                            : 'bg-[#000000]/80 hover:bg-[#18181B] text-[#A1A1AA] hover:text-white border-[#1F1F1F] hover:border-white'
+                        }`}
+                        title={isSelected ? `Deselect "${project.title}"` : `Select "${project.title}"`}
+                        aria-label={isSelected ? `Deselect project ${project.title}` : `Select project ${project.title}`}
+                        aria-pressed={isSelected}
+                      >
+                        {isSelected ? <Check className="w-3 h-3" /> : <CheckSquare className="w-3 h-3" />}
+                      </button>
 
                       {/* Remove Project Button */}
                       <button
@@ -637,17 +599,18 @@ export const Projects: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Confirmation Modal for Project Deletion (Move to Trash) */}
-      {projectToDelete && (
+      {/* Confirmation Modal for Project Deletion (permanent) */}
+      {projectToDelete.length > 0 && (
         <div
           id="delete-project-modal-overlay"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
-          onClick={() => setProjectToDelete(null)}
+          onClick={() => setProjectToDelete([])}
         >
           <div
             id="delete-project-modal-card"
@@ -661,7 +624,7 @@ export const Projects: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-bold uppercase tracking-tight text-white">
-                    Move to Trash
+                    {projectToDelete.length === 1 ? 'Delete Project' : 'Delete Projects'}
                   </h3>
                   <p className="text-xs text-[#71717A]">
                     Portfolio Showcase Management
@@ -670,7 +633,7 @@ export const Projects: React.FC = () => {
               </div>
 
               <button
-                onClick={() => setProjectToDelete(null)}
+                onClick={() => setProjectToDelete([])}
                 className="p-1 rounded-lg text-[#71717A] hover:text-white hover:bg-[#18181B] transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -678,12 +641,16 @@ export const Projects: React.FC = () => {
             </div>
 
             <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed">
-              Move <strong className="text-white font-semibold">"{projectToDelete.title}"</strong> to trash? You can restore it later from the trash bin.
+              {projectToDelete.length === 1 ? (
+                <>Permanently delete <strong className="text-white font-semibold">"{projectToDelete[0].title}"</strong>? This cannot be undone.</>
+              ) : (
+                <>Permanently delete <strong className="text-white font-semibold">{projectToDelete.length} projects</strong>? This cannot be undone.</>
+              )}
             </p>
 
             <div className="pt-2 flex items-center justify-end gap-2.5">
               <button
-                onClick={() => setProjectToDelete(null)}
+                onClick={() => setProjectToDelete([])}
                 className="px-4 py-2 rounded-xl bg-[#18181B] hover:bg-[#27272A] text-white text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
               >
                 Cancel
@@ -691,11 +658,11 @@ export const Projects: React.FC = () => {
 
               <button
                 id="btn-confirm-delete-project"
-                onClick={handleConfirmRemove}
+                onClick={handleConfirmDelete}
                 className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Move to Trash</span>
+                <span>Delete Forever</span>
               </button>
             </div>
           </div>
@@ -720,7 +687,7 @@ export const Projects: React.FC = () => {
         onDeleteProject={(id) => {
           const target = allProjects.find(p => p.id === id);
           if (target) {
-            setProjectToDelete(target);
+            setProjectToDelete([target]);
           }
         }}
       />

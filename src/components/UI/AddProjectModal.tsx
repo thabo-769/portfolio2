@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Sparkles, ExternalLink, Github, Image, Check, Trash2, Download, Upload } from 'lucide-react';
 import { Project } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
@@ -66,6 +66,8 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
   const [githubUrl, setGithubUrl] = useState('https://github.com/thabolanez4/');
   const [image, setImage] = useState(PRESET_IMAGES[0].url);
   const [customImageUrl, setCustomImageUrl] = useState('');
+  const [uploadedImage, setUploadedImage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [role, setRole] = useState('Lead Full-Stack Developer');
   const [duration, setDuration] = useState('3 Months');
   const [year, setYear] = useState(new Date().getFullYear());
@@ -122,7 +124,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
       .filter(Boolean);
 
     const nextNumber = String(existingCount + 1).padStart(2, '0');
-    const finalImage = customImageUrl.trim() || image;
+    const finalImage = uploadedImage || customImageUrl.trim() || image;
     const finalCategory = customCategory.trim() || category;
 
     const newProject: Project = {
@@ -160,6 +162,34 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
       setIsSuccess(false);
       onClose();
     }, 1200);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset input so re-selecting the same file re-triggers
+    e.target.value = '';
+
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Please upload a valid image file (PNG, JPG, WebP, GIF, SVG, etc.).');
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      setErrorMsg('Image is too large. Please keep it under 3 MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadedImage(reader.result as string);
+      setCustomImageUrl('');
+      setErrorMsg('');
+    };
+    reader.onerror = () => {
+      setErrorMsg('Could not read the selected image. Please try another file.');
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -398,15 +428,78 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({
               ))}
             </div>
 
-            <div className="pt-1">
+            <div className="pt-1 space-y-3">
+              {/* Uploaded image preview */}
+              {uploadedImage && (
+                <div className="relative aspect-video rounded-xl overflow-hidden border border-emerald-500/50 group">
+                  <img
+                    src={uploadedImage}
+                    alt="Uploaded preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/60 flex items-end p-2">
+                    <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                      Your Uploaded Image
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('pop');
+                      setUploadedImage('');
+                    }}
+                    className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer"
+                    title="Remove uploaded image"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                  {!customImageUrl && (
+                    <div className="absolute top-1.5 left-1.5 w-4 h-4 rounded-full bg-emerald-500 text-black flex items-center justify-center">
+                      <Check className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Upload button */}
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  fileInputRef.current?.click();
+                }}
+                className="inline-flex items-center gap-2 w-full justify-center px-4 py-2.5 rounded-xl bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[#A1A1AA] hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                <span>{uploadedImage ? 'Replace Uploaded Image' : 'Upload Image From Device'}</span>
+              </button>
               <input
-                id="input-project-custom-image"
-                type="url"
-                value={customImageUrl}
-                onChange={e => setCustomImageUrl(e.target.value)}
-                placeholder="Or paste custom image URL (https://...)"
-                className="w-full px-4 py-2 rounded-xl bg-[#000000] border border-[#1F1F1F] focus:border-white focus:outline-none text-white text-xs font-mono transition-colors"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
               />
+
+              <p className="text-[10px] text-[#52525B] uppercase tracking-wider leading-relaxed">
+                Supports PNG, JPG, WebP, GIF &amp; SVG (max 3 MB). The uploaded photo is embedded and
+                saved with the project.
+              </p>
+
+              {/* Custom URL as an alternative */}
+              <div className="pt-1">
+                <input
+                  id="input-project-custom-image"
+                  type="url"
+                  value={customImageUrl}
+                  onChange={e => {
+                    setCustomImageUrl(e.target.value);
+                    if (e.target.value.trim()) setUploadedImage('');
+                  }}
+                  placeholder="Or paste custom image URL (https://...)"
+                  className="w-full px-4 py-2 rounded-xl bg-[#000000] border border-[#1F1F1F] focus:border-white focus:outline-none text-white text-xs font-mono transition-colors"
+                />
+              </div>
             </div>
           </div>
 

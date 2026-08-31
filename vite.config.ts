@@ -11,6 +11,20 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      // Split large vendor libraries into their own chunks to avoid a single
+      // ~1MB bundle and improve caching + initial load performance.
+      chunkSizeWarningLimit: 700, // three.js is a large-but-cacheable vendor chunk
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            three: ['three'],
+            motion: ['framer-motion', 'motion'],
+            react: ['react', 'react-dom'],
+          },
+        },
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

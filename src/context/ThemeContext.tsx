@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { ThemeMode } from '../types';
 
 interface ThemeContextType {
@@ -64,12 +64,36 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  // Single shared AudioContext, created lazily and reused to avoid leaking a new
+  // context on every sound (browsers cap concurrent AudioContexts).
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const getAudioCtx = (): AudioContext | null => {
+    try {
+      if (audioCtxRef.current) {
+        return audioCtxRef.current;
+      }
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return null;
+      audioCtxRef.current = new AudioContextClass();
+      return audioCtxRef.current;
+    } catch {
+      return null;
+    }
+  };
+
   const playSound = (type: 'click' | 'pop' | 'success' | 'hover' = 'click') => {
     if (!soundEnabled) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
     try {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextClass) return;
-      const ctx = new AudioContextClass();
+      // The context may be suspended (autoplay policy) until the first user gesture.
+      if (ctx.state === 'suspended') {
+        void ctx.resume();
+      }
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
