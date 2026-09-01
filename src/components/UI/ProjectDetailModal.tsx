@@ -1,286 +1,322 @@
-import React, { useEffect, useState } from 'react';
-import { X, ExternalLink, Github, CheckCircle2, ShieldCheck, Trash2, AlertTriangle } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  X,
+  ExternalLink,
+  Github,
+  CheckCircle2,
+  CalendarDays,
+  Star,
+  Trash2,
+  Pencil,
+  ChevronLeft,
+  ChevronRight,
+  Tag,
+  CircleAlert,
+  Wrench,
+  Gauge,
+} from 'lucide-react';
 import { Project } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 
 interface ProjectDetailModalProps {
   project: Project | null;
   onClose: () => void;
-  onDeleteProject?: (projectId: string) => void;
+  onEditProject: (project: Project) => void;
+  onRequestDelete: (project: Project) => void;
+  onPrev: () => void;
+  onNext: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
 }
 
-export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({ project, onClose, onDeleteProject }) => {
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
+  project,
+  onClose,
+  onEditProject,
+  onRequestDelete,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
+}) => {
   const { playSound } = useTheme();
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
-    setConfirmDelete(false);
+    if (!project) return;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
   }, [project]);
 
   useEffect(() => {
+    if (!project) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        playSound('pop');
         onClose();
+      } else if (e.key === 'ArrowLeft' && hasPrev) {
+        onPrev();
+      } else if (e.key === 'ArrowRight' && hasNext) {
+        onNext();
       }
     };
-    if (project) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      document.body.style.overflow = 'auto';
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [project, onClose]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [project, onClose, onPrev, onNext, hasPrev, hasNext]);
 
   if (!project) return null;
 
-  const handleDelete = () => {
-    if (onDeleteProject) {
-      playSound('pop');
-      onDeleteProject(project.id);
-      onClose();
-    }
-  };
-
   return (
-    <div
-      id="project-detail-modal-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-black/90 backdrop-blur-md animate-in fade-in duration-200 text-left"
-      onClick={e => {
-        if (e.target === e.currentTarget) {
-          playSound('pop');
-          onClose();
-        }
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-project-title"
-    >
-      <div
-        id="project-detail-modal-card"
-        className="relative w-full max-w-4xl max-h-[90vh] bg-[#000000] border border-[#1F1F1F] rounded-3xl shadow-2xl overflow-y-auto text-white text-left"
-      >
-        {/* Close Button */}
-        <button
-          id="btn-close-project-modal"
-          onClick={() => {
-            playSound('pop');
-            onClose();
+    <AnimatePresence>
+      {project && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 md:p-8 bg-black/90 backdrop-blur-md"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={e => {
+            if (e.target === e.currentTarget) {
+              playSound('pop');
+              onClose();
+            }
           }}
-          aria-label="Close modal"
-          className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-[#0C0C0C] hover:bg-white hover:text-[#000000] text-white transition-colors border border-[#1F1F1F] cursor-pointer shadow-lg"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="project-detail-title"
         >
-          <X className="w-5 h-5" />
-        </button>
+          <motion.div
+            className="relative w-full max-w-4xl max-h-[92vh] bg-[#000000] border border-[#1F1F1F] rounded-3xl shadow-2xl overflow-y-auto text-white"
+            initial={{ opacity: 0, y: 18, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            transition={{ duration: 0.25 }}
+          >
+            <button
+              onClick={() => {
+                playSound('pop');
+                onClose();
+              }}
+              aria-label="Close modal"
+              className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-[#0C0C0C] hover:bg-white hover:text-[#000000] text-white transition-colors border border-[#1F1F1F] cursor-pointer shadow-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-        {/* Hero Banner Image */}
-        <div className="relative h-64 sm:h-80 w-full overflow-hidden bg-[#000000] text-left">
-          <img
-            src={project.image}
-            alt={project.title}
-            className="w-full h-full object-cover object-center transform hover:scale-105 transition-transform duration-700"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-[#000000]/60 to-transparent" />
-          
-          <div className="absolute bottom-6 left-6 right-6 flex flex-wrap items-end justify-between gap-4 text-left">
-            <div className="text-left">
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs uppercase tracking-wider font-semibold bg-white text-[#000000] mb-2 shadow-md">
-                {project.number} — {project.category}
-              </span>
-              <h2 id="modal-project-title" className="text-3xl sm:text-4xl lg:text-5xl font-semibold font-serif uppercase tracking-tight text-white">
-                {project.title}
-              </h2>
-              <p className="text-sm sm:text-base text-[#A1A1AA] mt-1 max-w-xl font-sans font-normal">
-                {project.tagline}
-              </p>
-            </div>
+            <div className="relative h-56 sm:h-72 w-full overflow-hidden bg-[#000000]">
+              <img
+                src={project.image}
+                alt={project.name}
+                className="w-full h-full object-cover object-center transition-transform duration-700"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#000000] via-[#000000]/55 to-transparent" />
 
-            <div className="flex items-center gap-3">
-              <a
-                id="modal-github-link"
-                href={project.githubUrl || `https://github.com/thabolanez4/${project.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`View ${project.title} on GitHub`}
-                className="px-4 py-2 rounded-lg bg-[#0C0C0C] hover:bg-[#18181B] text-white text-xs sm:text-sm font-semibold tracking-wide transition-colors flex items-center gap-2 border border-[#1F1F1F] hover:border-white"
-              >
-                <Github className="w-4 h-4" />
-                <span>GitHub</span>
-              </a>
-
-              <a
-                id="modal-live-link"
-                href={project.liveUrl || 'https://github.com/thabolanez4'}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Launch ${project.title} live demo`}
-                className="px-4 py-2 rounded-lg bg-white hover:bg-[#A1A1AA] text-[#000000] text-xs sm:text-sm font-bold uppercase tracking-wider transition-colors flex items-center gap-2 shadow-md hover:scale-105"
-              >
-                <span>Live Demo</span>
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Body */}
-        <div className="p-6 sm:p-8 space-y-8 text-left font-sans">
-          
-          {/* Metadata Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-[#0C0C0C]/85 border border-[#1F1F1F] text-left">
-            <div>
-              <p className="text-[10px] uppercase font-bold tracking-wider text-[#71717A]">Duration</p>
-              <p className="text-sm font-semibold text-white mt-0.5">{project.duration}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold tracking-wider text-[#71717A]">Role</p>
-              <p className="text-sm font-semibold text-white mt-0.5">{project.role}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold tracking-wider text-[#71717A]">Year</p>
-              <p className="text-sm font-semibold text-white mt-0.5">{project.year}</p>
-            </div>
-            <div>
-              <p className="text-[10px] uppercase font-bold tracking-wider text-[#71717A]">Key Metric</p>
-              <p className="text-sm font-semibold text-white mt-0.5">{project.metrics?.[0]?.value || 'Production'}</p>
-            </div>
-          </div>
-
-          {/* Full Narrative Overview */}
-          <div className="space-y-3 text-left">
-            <h3 className="text-xl font-serif font-bold text-white uppercase tracking-tight">
-              Executive Architectural Summary
-            </h3>
-            <p className="text-sm sm:text-base text-[#A1A1AA] leading-relaxed font-sans font-normal">
-              {project.longDescription}
-            </p>
-          </div>
-
-          {/* Challenge vs Solution Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-            <div className="p-6 rounded-2xl bg-[#0C0C0C]/85 border border-[#1F1F1F] space-y-2 text-left">
-              <h4 className="text-xs uppercase font-bold tracking-wider text-[#A1A1AA] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#71717A]" />
-                <span>The Architectural Challenge</span>
-              </h4>
-              <p className="text-sm text-[#A1A1AA] leading-relaxed font-sans font-normal">
-                {project.challenge}
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-[#0C0C0C]/85 border border-[#1F1F1F] space-y-2 text-left">
-              <h4 className="text-xs uppercase font-bold tracking-wider text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-white" />
-                <span>The Engineered Solution</span>
-              </h4>
-              <p className="text-sm text-[#A1A1AA] leading-relaxed font-sans font-normal">
-                {project.solution}
-              </p>
-            </div>
-          </div>
-
-          {/* Core Feature Highlights */}
-          <div className="space-y-4 text-left">
-            <h3 className="text-xl font-serif font-bold text-white uppercase tracking-tight">
-              Core Technical Features & Capabilities
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-              {project.features.map((feature, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-[#0C0C0C]/50 border border-[#1F1F1F] text-left">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span className="text-xs sm:text-sm text-[#A1A1AA] font-sans leading-snug">{feature}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Technology Stack Grid */}
-          <div className="space-y-3 text-left">
-            <h3 className="text-xl font-serif font-bold text-white uppercase tracking-tight">
-              Technologies & Infrastructure
-            </h3>
-            <div className="flex flex-wrap gap-2 text-left">
-              {project.technologies.map(tech => (
-                <span
-                  key={tech}
-                  className="px-3 py-1.5 rounded-lg bg-[#0C0C0C] text-white text-xs font-semibold tracking-wide border border-[#1F1F1F]"
-                >
-                  {tech}
-                </span>
-              ))}
-            </div>
-          </div>
-
-        </div>
-
-        {/* Footer Actions */}
-        <div className="p-6 border-t border-[#1F1F1F] flex flex-wrap items-center justify-between gap-4 bg-[#000000] text-left">
-          <div className="flex items-center gap-3">
-            {onDeleteProject && (
-              <>
-                {confirmDelete ? (
-                  <div className="flex items-center gap-2 p-1.5 px-3 rounded-xl bg-red-950/40 border border-red-800 text-xs">
-                    <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                    <span className="text-red-300">Remove project?</span>
-                    <button
-                      onClick={handleDelete}
-                      className="px-2.5 py-1 rounded-md bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] uppercase tracking-wider transition-colors cursor-pointer"
-                    >
-                      Yes, Remove
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete(false)}
-                      className="px-2 py-1 rounded-md bg-[#1F1F1F] hover:bg-[#27272A] text-[#A1A1AA] text-[11px] transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
+              <div className="absolute bottom-5 left-5 right-5 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs uppercase tracking-wider font-semibold bg-white text-[#000000] shadow-md">
+                      {project.category}
+                    </span>
+                    {project.featured && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs uppercase tracking-wider font-semibold bg-[#18181B] border border-[#27272A] text-[#A1A1AA]">
+                        <Star className="w-3 h-3" /> Featured
+                      </span>
+                    )}
+                    {project.status && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs uppercase tracking-wider font-semibold bg-[#18181B] border border-[#27272A] text-[#A1A1AA]">
+                        <Tag className="w-3 h-3" /> {project.status}
+                      </span>
+                    )}
                   </div>
-                ) : (
+                  <h2 id="project-detail-title" className="text-3xl sm:text-4xl font-semibold uppercase tracking-tight text-white">
+                    {project.name}
+                  </h2>
+                  <p className="mt-1 text-sm text-[#C9C9CF] max-w-xl">{project.shortDescription}</p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-[#0C0C0C] border border-[#1F1F1F] text-[#A1A1AA]">
+                  <CalendarDays className="w-3.5 h-3.5" /> {formatDate(project.completionDate)}
+                </span>
+              </div>
+            </div>
+<div className="p-6 sm:p-8 space-y-6">
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#A1A1AA]">Overview</h3>
+                <p className="mt-2 text-sm sm:text-base text-[#E6E6EA] leading-relaxed">{project.description}</p>
+              </section>
+
+              {(project.client || project.projectType) && (
+                <section className="flex flex-wrap gap-2 items-center">
+                  {project.projectType && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#18181B] border border-[#27272A] text-xs text-[#A1A1AA]">
+                      <Gauge className="w-3.5 h-3.5" /> {project.projectType}
+                    </span>
+                  )}
+                  {project.client && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#18181B] border border-[#27272A] text-xs text-[#A1A1AA]">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {project.client}
+                    </span>
+                  )}
+                </section>
+              )}
+
+              {project.technologies.length > 0 && (
+                <section>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#A1A1AA]">Tech Stack</h3>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {project.technologies.map(tech => (
+                      <span key={tech} className="px-3 py-1.5 rounded-full bg-[#18181B] border border-[#27272A] text-xs text-[#D8D8DC]">
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+<section>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#A1A1AA]">Key Features</h3>
+                <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {project.features.map(feature => (
+                    <li key={feature} className="flex items-start gap-2.5 text-sm text-[#D8D8DC] leading-relaxed">
+                      <CheckCircle2 className="w-4 h-4 flex-none text-white" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              {(project.challenges || project.solutions) && (
+                <section className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {project.challenges && (
+                    <div>
+                      <h3 className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#A1A1AA]">
+                        <CircleAlert className="w-3.5 h-3.5" /> Challenges
+                      </h3>
+                      <p className="mt-2 text-sm text-[#D8D8DC] leading-relaxed">{project.challenges}</p>
+                    </div>
+                  )}
+                  {project.solutions && (
+                    <div>
+                      <h3 className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#A1A1AA]">
+                        <Wrench className="w-3.5 h-3.5" /> Solutions
+                      </h3>
+                      <p className="mt-2 text-sm text-[#D8D8DC] leading-relaxed">{project.solutions}</p>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {project.results && (
+                <section>
+                  <h3 className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#A1A1AA]">
+                    <Gauge className="w-3.5 h-3.5" /> Results
+                  </h3>
+                  <p className="mt-2 text-sm text-[#D8D8DC] leading-relaxed">{project.results}</p>
+                </section>
+              )}
+
+              {project.images.length > 0 && (
+                <section>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#A1A1AA]">Gallery</h3>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    {project.images.map((img, index) => (
+                      <img
+                        key={index}
+                        src={img}
+                        alt={`${project.name} screenshot ${index + 1}`}
+                        className="w-40 h-28 rounded-xl object-cover border border-[#1F1F1F]"
+                        loading="lazy"
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+<div className="p-5 sm:p-6 border-t border-[#1F1F1F] flex flex-wrap items-center justify-between gap-3 bg-[#000000]">
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={onPrev}
+                  disabled={!hasPrev}
+                  aria-label="Previous project"
+                  className="p-2.5 rounded-full bg-[#0C0C0C] hover:bg-[#18181B] text-[#A1A1AA] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer border border-[#1F1F1F]"
+                >
+                  <ChevronLeft className="w-4.5 h-4.5" />
+                </button>
+                <button
+                  onClick={onNext}
+                  disabled={!hasNext}
+                  aria-label="Next project"
+                  className="p-2.5 rounded-full bg-[#0C0C0C] hover:bg-[#18181B] text-[#A1A1AA] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer border border-[#1F1F1F]"
+                >
+                  <ChevronRight className="w-4.5 h-4.5" />
+                </button>
+                <span className="text-xs text-[#71717A]">Press ← → to navigate</span>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                {onRequestDelete && (
                   <button
                     onClick={() => {
                       playSound('click');
-                      setConfirmDelete(true);
+                      onRequestDelete(project);
                     }}
                     className="px-3.5 py-2 rounded-xl bg-[#121214] hover:bg-red-950/60 hover:text-red-300 hover:border-red-800 border border-[#27272A] text-[#71717A] text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
                     title="Remove this project from portfolio"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Remove</span>
+                    <span>Delete</span>
                   </button>
                 )}
-              </>
-            )}
+                {onEditProject && (
+                  <button
+                    onClick={() => {
+                      playSound('click');
+                      onEditProject(project);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-[#121214] hover:bg-[#18181B] hover:text-white border border-[#27272A] text-[#71717A] text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+                )}
+              </div>
 
-            <div className="hidden sm:flex items-center gap-2 text-xs text-[#71717A] font-sans">
-              <ShieldCheck className="w-4 h-4 text-white" />
-              <span>Production Architecture</span>
+              <div className="flex items-center gap-3">
+                <a
+                  href={project.githubUrl || `https://github.com/thabolanez4/${project.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 rounded-xl bg-[#0C0C0C] hover:bg-[#18181B] text-white text-xs font-semibold uppercase tracking-wider transition-colors flex items-center gap-2 border border-[#1F1F1F] hover:border-white"
+                >
+                  <Github className="w-4 h-4" />
+                  <span>Source Code</span>
+                </a>
+
+                <a
+                  href={project.liveUrl || 'https://github.com/thabolanez4'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-2.5 rounded-xl bg-white hover:bg-[#A1A1AA] text-[#000000] text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-md hover:scale-105"
+                >
+                  <span>Launch Live Demo</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <a
-              href={project.githubUrl || `https://github.com/thabolanez4/${project.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2.5 rounded-xl bg-[#0C0C0C] hover:bg-[#18181B] text-white text-xs font-semibold uppercase tracking-wider transition-colors flex items-center gap-2 border border-[#1F1F1F] hover:border-white"
-            >
-              <Github className="w-4 h-4" />
-              <span>Source Code</span>
-            </a>
-
-            <a
-              href={project.liveUrl || 'https://github.com/thabolanez4'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-2.5 rounded-xl bg-white hover:bg-[#A1A1AA] text-[#000000] text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-md hover:scale-105"
-            >
-              <span>Launch Live Demo</span>
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

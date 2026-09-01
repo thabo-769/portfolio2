@@ -1,29 +1,32 @@
 export type ThemeMode = 'dark' | 'light';
 
+export type ProjectCategory = 'Personal' | 'Business' | 'Mobile' | 'Gift' | 'Other';
+export type ProjectStatus = 'In Progress' | 'Completed' | 'On Hold' | 'Archived';
+
 export interface Project {
   id: string;
-  number: string;
-  title: string;
-  tagline: string;
+  name: string;
   shortDescription: string;
-  longDescription: string;
-  category: 'AI & Fullstack' | 'E-commerce' | 'Real Estate' | 'Clean Energy' | 'Digital Experience' | 'Mobile App' | 'Cloud & DevOps' | (string & {});
-  image: string;
+  description: string;
+  category: ProjectCategory | (string & {});
   technologies: string[];
-  liveUrl: string;
+  image: string; // Main thumbnail / hero image
+  images: string[]; // Additional gallery images
   githubUrl: string;
+  liveUrl: string;
+  status: ProjectStatus | (string & {});
   featured: boolean;
-  year: number;
-  role: string;
-  duration: string;
-  challenge: string;
-  solution: string;
+  completionDate: string; // ISO date
+  client: string; // Optional client / company name
+  projectType: string; // e.g. Full Stack, 3D Experience
   features: string[];
-  metrics: {
-    label: string;
-    value: string;
-  }[];
-  deletedAt?: number; // Timestamp when deleted (null means not deleted)
+  challenges: string;
+  solutions: string;
+  results: string;
+  createdAt: number;
+  updatedAt: number;
+  deletedAt: number | null; // Timestamp when soft-deleted (null = active)
+  isDeleted: boolean;
 }
 
 export interface Skill {

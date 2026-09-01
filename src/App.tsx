@@ -19,7 +19,7 @@ function AppContent() {
       className={`min-h-screen ${
         theme === 'light'
           ? 'bg-[#F0F4F6] text-[#0D1F23] selection:bg-[#2D4A53] selection:text-white'
-          : 'bg-[#0D1F23] text-white selection:bg-[#2D4A53] selection:text-white'
+          : 'bg-[#000000] text-white selection:bg-[#1F1F1F] selection:text-white'
       } flex flex-col font-sans antialiased overflow-x-hidden transition-colors duration-300`}
     >
       {/* Navigation with Top Scroll Progress Indicator */}
