@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Project } from '../../types';
 import { ProjectDetailModal } from '../UI/ProjectDetailModal';
 import { AddProjectModal } from '../UI/AddProjectModal';
-import { ExternalLink, Github, ArrowUpRight, ChevronLeft, ChevronRight, Plus, Trash2, AlertTriangle, X, Check, Trash, MoreVertical, CheckSquare } from 'lucide-react';
+import { ExternalLink, Github, ArrowUpRight, ChevronLeft, ChevronRight, Plus, Trash2, AlertTriangle, X, Trash, MoreVertical, CheckSquare } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 const LOCAL_STORAGE_KEY = 'thabo_portfolio_all_projects_v2';
@@ -461,17 +461,6 @@ export const Projects: React.FC = () => {
                     : 'border-[#1F1F1F] hover:border-[#3F3F46]'
                 } shadow-[0_6px_25px_rgb(0,0,0,0.8)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_12px_35px_rgb(0,0,0,0.9)] cursor-pointer group text-left overflow-hidden relative`}
               >
-                {/* Selection checkbox indicator (always visible) */}
-                <div
-                  className={`absolute top-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center justify-center w-6 h-6 rounded-full border-2 shadow-md pointer-events-none transition-all ${
-                    isSelected
-                      ? 'bg-emerald-500 border-emerald-300 text-black'
-                      : 'bg-black/75 border-white/60 text-white'
-                  }`}
-                >
-                  {isSelected ? <Check className="w-3.5 h-3.5" /> : <CheckSquare className="w-3 h-3 opacity-80" />}
-                </div>
-
                 {/* Card Image Banner - Compact */}
                 <div className="relative h-28 sm:h-32 w-full overflow-hidden bg-[#000000]">
                   <img
@@ -493,26 +482,6 @@ export const Projects: React.FC = () => {
                       <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#000000]/85 backdrop-blur-md text-white border border-[#1F1F1F]">
                         {project.category}
                       </span>
-
-                      {/* Select Project Button (toggle selection) */}
-                      <button
-                        id={`btn-select-project-${project.id}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          playSound('click');
-                          toggleSelect(project.id);
-                        }}
-                        className={`p-1 rounded-md border transition-all cursor-pointer shadow-sm ${
-                          isSelected
-                            ? 'bg-emerald-500 hover:bg-emerald-400 border-emerald-300 text-black'
-                            : 'bg-[#000000]/80 hover:bg-[#18181B] text-[#A1A1AA] hover:text-white border-[#1F1F1F] hover:border-white'
-                        }`}
-                        title={isSelected ? `Deselect "${project.title}"` : `Select "${project.title}"`}
-                        aria-label={isSelected ? `Deselect project ${project.title}` : `Select project ${project.title}`}
-                        aria-pressed={isSelected}
-                      >
-                        {isSelected ? <Check className="w-3 h-3" /> : <CheckSquare className="w-3 h-3" />}
-                      </button>
 
                       {/* Remove Project Button */}
                       <button
