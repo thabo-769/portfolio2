@@ -861,11 +861,12 @@ return (
           viewProjects.length === 0 ? (
             renderEmptyActive()
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
+            <div className="grid grid-rows-2 grid-flow-col auto-cols-[minmax(280px,360px)] gap-7 overflow-x-auto overscroll-x-contain pb-5 scrollbar-none snap-x snap-mandatory">
               <AnimatePresence>
                 {viewProjects.map((project, index) => (
                   <motion.div
                     key={project.id}
+                    className="min-w-0 snap-start"
                     layout
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
