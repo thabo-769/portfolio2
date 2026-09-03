@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, FileText } from 'lucide-react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { Hero3DCanvas } from '../3D/Hero3DCanvas';
@@ -15,7 +16,28 @@ const FULL_NAME = `${FULL_FIRST} ${FULL_LAST}`;
 
 export const Hero: React.FC<HeroProps> = ({ onOpenResume }) => {
   const { playSound } = useTheme();
+  const navigate = useNavigate();
   const heroRef = useRef<HTMLElement>(null);
+
+  // Extended-tap shortcut to the hidden admin login: three quick taps on the
+  // portfolio name within a 2-second window opens the secure login screen.
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleNameTap = () => {
+    playSound('pop');
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    if (tapCountRef.current >= 3) {
+      tapCountRef.current = 0;
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+      navigate('/admin/login');
+      return;
+    }
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 2000);
+  };
 
   // Letter-by-letter appearing and disappearing typewriter state loop
   const [charIndex, setCharIndex] = useState<number>(0);
@@ -139,6 +161,8 @@ export const Hero: React.FC<HeroProps> = ({ onOpenResume }) => {
           <div className="space-y-1 text-left min-h-[110px] sm:min-h-[140px] md:min-h-[180px] lg:min-h-[210px] flex flex-col justify-center">
             <h1 
               aria-label="Thabo Tshabangu"
+              onClick={handleNameTap}
+              title=""
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white uppercase leading-[0.95] text-left"
             >
               {/* Line 1: First Name */}

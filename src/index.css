@@ -154,3 +154,58 @@
 .puzzle-assembled {
   animation: puzzleAssemble 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ------------------------------------------------------------------ */
+/* Skills marquee — four seamless horizontal moving rows               */
+/* ------------------------------------------------------------------ */
+
+@keyframes marqueeForward {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes marqueeReverse {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* Row wrapper: hides overflow so no native scrollbars appear. */
+.marquee-track {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+/* Inner scroller: two identical copies side by side make the loop seamless. */
+.marquee-row {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.marquee-row--forward {
+  animation: marqueeForward var(--marquee-duration, 34s) linear infinite;
+}
+
+.marquee-row--reverse {
+  animation: marqueeReverse var(--marquee-duration, 34s) linear infinite;
+}
+
+.marquee-track:hover .marquee-row {
+  animation-play-state: paused;
+}
+
+/* Respect users who prefer reduced motion — stop the marquees entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .marquee-row {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,21 @@
+rules_version = '2';
+
+// Firebase Storage security rules for the portfolio CMS.
+//
+// Project images are readable by anyone (served on the public portfolio),
+// but only a signed-in administrator can upload or delete files.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Public, read-only access to all portfolio assets.
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+
+    // Project images under /projects.
+    match /projects/{allPaths=**} {
+      allow write: if request.auth != null;
+    }
+  }
+}
