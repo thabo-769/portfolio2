@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
@@ -6,19 +6,27 @@ import { Navbar } from './components/Layout/Navbar';
 import { Footer } from './components/Layout/Footer';
 import { Hero } from './components/Sections/Hero';
 import { About } from './components/Sections/About';
-import { Skills } from './components/Sections/Skills';
 import { Projects } from './components/Sections/Projects';
 import { Referrals } from './components/Sections/Referrals';
 import { Contact } from './components/Sections/Contact';
+import { PrimaryTechStrip } from './components/UI/PrimaryTechStrip';
 import { ResumeModal } from './components/UI/ResumeModal';
-import { AdminLogin } from './pages/AdminLogin';
 import { AdminDashboard } from './admin/AdminDashboard';
-import { ProtectedRoute } from './admin/ProtectedRoute';
 import { ToastProvider } from './admin/ToastContext';
+import { getFirebaseAnalytics } from './firebase/config';
+import { PortfolioCmsProvider, usePortfolioCms } from './context/PortfolioCmsContext';
 
 function Portfolio() {
   const [isResumeOpen, setIsResumeOpen] = useState<boolean>(false);
   const { theme } = useTheme();
+  const { trackEvent } = usePortfolioCms();
+  const didTrackView = useRef(false);
+
+  useEffect(() => {
+    if (didTrackView.current) return;
+    didTrackView.current = true;
+    void trackEvent({ type: 'portfolio_view', label: 'Public portfolio loaded' });
+  }, [trackEvent]);
 
   return (
     <div
@@ -33,7 +41,7 @@ function Portfolio() {
       <main id="main-content" className="flex-1">
         <Hero onOpenResume={() => setIsResumeOpen(true)} />
         <About onOpenResume={() => setIsResumeOpen(true)} />
-        <Skills />
+        <PrimaryTechStrip />
         <Projects />
         <Referrals />
         <Contact />
@@ -50,26 +58,24 @@ function Portfolio() {
 }
 
 export function App() {
+  useEffect(() => {
+    void getFirebaseAnalytics();
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ToastProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Portfolio />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute>
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </ToastProvider>
+        <PortfolioCmsProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Portfolio />} />
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </ToastProvider>
+        </PortfolioCmsProvider>
       </AuthProvider>
     </ThemeProvider>
   );

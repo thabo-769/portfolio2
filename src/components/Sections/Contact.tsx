@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Mail, Github, Linkedin, Send, CheckCircle2, ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, CheckCircle2, Github, Linkedin, Mail, Send } from 'lucide-react';
 import { ContactFormData, FormErrors } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { usePortfolioCms } from '../../context/PortfolioCmsContext';
 import confetti from 'canvas-confetti';
 
 export const Contact: React.FC = () => {
   const { playSound } = useTheme();
+  const { content, sendMessage, logActivity, trackEvent } = usePortfolioCms();
   const [formData, setFormData] = useState<ContactFormData>({
     name: '',
     email: '',
@@ -37,7 +39,7 @@ export const Contact: React.FC = () => {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
       playSound('hover');
@@ -47,7 +49,24 @@ export const Contact: React.FC = () => {
     setIsSubmitting(true);
     playSound('click');
 
-    setTimeout(() => {
+    try {
+      await sendMessage({
+        senderName: formData.name.trim(),
+        email: formData.email.trim(),
+        subject: formData.subject.trim(),
+        message: formData.message.trim(),
+      });
+      await trackEvent({
+        type: 'contact_submission',
+        label: formData.subject.trim() || 'Contact form submission',
+      });
+      await logActivity({
+        action: 'Message received',
+        item: formData.subject.trim() || formData.name.trim(),
+        itemType: 'message',
+        user: formData.name.trim(),
+      });
+
       setIsSubmitting(false);
       setSubmitSuccess(true);
       playSound('success');
@@ -57,7 +76,7 @@ export const Contact: React.FC = () => {
           particleCount: 60,
           spread: 60,
           origin: { y: 0.6 },
-          colors: ['#FFFFFF', '#A1A1AA', '#71717A']
+          colors: ['#FFFFFF', '#A1A1AA', '#71717A'],
         });
       } catch {
         // Fallback silently
@@ -74,135 +93,111 @@ export const Contact: React.FC = () => {
       setTimeout(() => {
         setSubmitSuccess(false);
       }, 5000);
-    }, 600);
+    } catch (error) {
+      setIsSubmitting(false);
+      setErrors(prev => ({ ...prev, message: error instanceof Error ? error.message : 'Unable to send your message.' }));
+    }
   };
 
   return (
     <section
       id="contact"
       aria-label="Contact Section"
-      className="relative py-24 sm:py-32 bg-[#000000] text-white border-t border-[#1F1F1F] text-left font-sans"
+      className="relative border-t border-white/10 bg-[#000000] py-24 text-left font-sans text-white sm:py-32"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-left">
-        
-        {/* Section Header */}
-        <div className="text-left max-w-2xl mb-12 sm:mb-16 space-y-3">
-          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A1A1AA] text-left">
-            <span className="w-4 h-0.5 bg-[#71717A]" />
-            <span>06 // CONTACT & INQUIRIES</span>
+      <div className="mx-auto max-w-7xl px-4 text-left sm:px-6 lg:px-8">
+        <div className="mb-12 max-w-2xl space-y-3 text-left sm:mb-16">
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">
+            <span className="h-0.5 w-4 bg-[#71717A]" />
+            <span>Contact</span>
           </div>
-
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white uppercase text-left">
-            LET'S WORK TOGETHER.
+          <h2 className="text-3xl font-bold uppercase tracking-tight text-white sm:text-4xl md:text-5xl">
+            Let's work together.
           </h2>
-
-          <p className="text-sm sm:text-base text-[#A1A1AA] leading-relaxed text-left">
+          <p className="text-sm leading-relaxed text-[#A1A1AA] sm:text-base">
             Have a project in mind or an open engineering role? Drop a message below or connect directly.
           </p>
         </div>
 
-        {/* Simple 2-Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start text-left">
-          
-          {/* Direct Contact & Social Links */}
-          <div className="lg:col-span-5 space-y-6 text-left">
-            <div className="p-6 sm:p-7 rounded-2xl bg-[#0C0C0C] border border-[#1F1F1F] space-y-6">
+        <div className="grid grid-cols-1 items-start gap-8 text-left lg:grid-cols-12">
+          <div className="space-y-6 text-left lg:col-span-5">
+            <div className="space-y-5 rounded-2xl border border-white/10 bg-[#0C0C0C] p-6 sm:p-7">
               <div>
-                <p className="text-xs font-mono uppercase tracking-wider text-[#71717A] mb-1">
-                  Direct Email
-                </p>
+                <p className="mb-1 text-xs uppercase tracking-wider text-[#71717A]">Direct email</p>
                 <a
-                  href="mailto:thabolanez4@gmail.com"
-                  className="text-lg sm:text-xl font-bold text-white hover:text-[#A1A1AA] transition-colors inline-flex items-center gap-2"
+                  href={`mailto:${content.contact.email}`}
+                  className="inline-flex items-center gap-2 text-lg font-bold text-white transition-colors hover:text-[#A1A1AA] sm:text-xl"
                 >
-                  <span>thabolanez4@gmail.com</span>
-                  <ArrowUpRight className="w-4 h-4 text-[#71717A]" />
+                  <span>{content.contact.email}</span>
+                  <ArrowUpRight className="h-4 w-4 text-[#71717A]" />
                 </a>
               </div>
 
-              <div className="border-t border-[#1F1F1F] pt-5">
-                <p className="text-xs font-mono uppercase tracking-wider text-[#71717A] mb-3">
-                  Connect & Socials
-                </p>
+              <div className="border-t border-white/10 pt-5">
+                <p className="mb-3 text-xs uppercase tracking-wider text-[#71717A]">Phone</p>
+                <p className="text-sm text-white">{content.contact.phone}</p>
+              </div>
+
+              <div className="border-t border-white/10 pt-5">
+                <p className="mb-3 text-xs uppercase tracking-wider text-[#71717A]">Connect</p>
                 <div className="flex flex-wrap gap-3">
-                  <a
-                    href="https://github.com/thabolanez4"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#18181B] hover:bg-white hover:text-black border border-[#27272A] text-xs font-semibold uppercase tracking-wider transition-all duration-200"
-                  >
-                    <Github className="w-3.5 h-3.5" />
-                    <span>GitHub</span>
-                  </a>
-
-                  <a
-                    href="https://linkedin.com/in/thabo-tshabangu"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#18181B] hover:bg-white hover:text-black border border-[#27272A] text-xs font-semibold uppercase tracking-wider transition-all duration-200"
-                  >
-                    <Linkedin className="w-3.5 h-3.5" />
-                    <span>LinkedIn</span>
-                  </a>
-
-                  <a
-                    href="mailto:thabolanez4@gmail.com"
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#18181B] hover:bg-white hover:text-black border border-[#27272A] text-xs font-semibold uppercase tracking-wider transition-all duration-200"
-                  >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>Email</span>
-                  </a>
+                  {content.contact.socials.map(link => (
+                    <a
+                      key={link.label}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#18181B] px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-white transition-all duration-200 hover:bg-white hover:text-black"
+                    >
+                      {link.label === 'GitHub' ? <Github className="h-3.5 w-3.5" /> : link.label === 'LinkedIn' ? <Linkedin className="h-3.5 w-3.5" /> : <Mail className="h-3.5 w-3.5" />}
+                      <span>{link.label}</span>
+                    </a>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Simple Contact Form */}
           <div className="lg:col-span-7">
-            <div className="p-6 sm:p-8 rounded-2xl bg-[#0C0C0C] border border-[#1F1F1F]">
+            <div className="rounded-2xl border border-white/10 bg-[#0C0C0C] p-6 sm:p-8">
               {submitSuccess ? (
-                <div className="p-6 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5" />
+                <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-black/20 p-6 text-white">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
                   <div>
-                    <h3 className="font-bold text-white text-sm">Message Sent Successfully</h3>
-                    <p className="text-xs text-[#A1A1AA] mt-1 leading-relaxed">
-                      Thank you for reaching out! I will review your message and get back to you shortly.
+                    <h3 className="text-sm font-bold text-white">Message sent successfully</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-[#A1A1AA]">
+                      Thank you for reaching out. Your message has been saved to the inbox and will be reviewed shortly.
                     </p>
                   </div>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} noValidate className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label htmlFor="contact-name" className="block text-xs font-semibold uppercase tracking-wider text-[#A1A1AA]">
-                        Name
-                      </label>
-                      <input
-                        id="contact-name"
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Your name"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#000000] border border-[#27272A] focus:border-white focus:outline-none text-white text-sm placeholder-[#52525B] transition-colors"
-                      />
-                      {errors.name && <p className="text-[11px] text-rose-400">{errors.name}</p>}
-                    </div>
-
-                    <div className="space-y-1">
-                      <label htmlFor="contact-email" className="block text-xs font-semibold uppercase tracking-wider text-[#A1A1AA]">
-                        Email
-                      </label>
-                      <input
-                        id="contact-email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="your.email@domain.com"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#000000] border border-[#27272A] focus:border-white focus:outline-none text-white text-sm placeholder-[#52525B] transition-colors"
-                      />
-                      {errors.email && <p className="text-[11px] text-rose-400">{errors.email}</p>}
-                    </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <InputField
+                      id="contact-name"
+                      label="Name"
+                      value={formData.name}
+                      onChange={value => setFormData(prev => ({ ...prev, name: value }))}
+                      placeholder="Your name"
+                      error={errors.name}
+                    />
+                    <InputField
+                      id="contact-email"
+                      label="Email"
+                      value={formData.email}
+                      onChange={value => setFormData(prev => ({ ...prev, email: value }))}
+                      placeholder="your.email@domain.com"
+                      error={errors.email}
+                    />
                   </div>
+
+                  <InputField
+                    id="contact-subject"
+                    label="Subject"
+                    value={formData.subject}
+                    onChange={value => setFormData(prev => ({ ...prev, subject: value }))}
+                    placeholder="Project inquiry"
+                  />
 
                   <div className="space-y-1">
                     <label htmlFor="contact-message" className="block text-xs font-semibold uppercase tracking-wider text-[#A1A1AA]">
@@ -210,32 +205,64 @@ export const Contact: React.FC = () => {
                     </label>
                     <textarea
                       id="contact-message"
-                      rows={4}
+                      rows={5}
                       value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      onChange={e => setFormData({ ...formData, message: e.target.value })}
                       placeholder="Tell me about your project, timeline, or inquiry..."
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#000000] border border-[#27272A] focus:border-white focus:outline-none text-white text-sm placeholder-[#52525B] transition-colors resize-none leading-relaxed"
+                      className="w-full resize-none rounded-xl border border-white/10 bg-black/20 px-3.5 py-2.5 text-sm leading-relaxed text-white placeholder:text-[#52525B] outline-none transition-colors focus:border-white/30"
                     />
-                    {errors.message && <p className="text-[11px] text-rose-400">{errors.message}</p>}
+                    {errors.message && <p className="text-[11px] text-zinc-400">{errors.message}</p>}
                   </div>
 
                   <button
-                    id="btn-send-contact-message"
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-3 rounded-xl bg-white hover:bg-[#D4D4D8] text-black text-xs sm:text-sm font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-xs font-bold uppercase tracking-wider text-black transition-all duration-200 disabled:opacity-50"
                   >
-                    <Send className="w-4 h-4" />
-                    <span>{isSubmitting ? 'Sending...' : 'Send Message'}</span>
+                    <Send className="h-4 w-4" />
+                    <span>{isSubmitting ? 'Sending...' : 'Send message'}</span>
                   </button>
                 </form>
               )}
             </div>
           </div>
-
         </div>
       </div>
     </section>
   );
 };
 
+function InputField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  error,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  error?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <label htmlFor={id} className="block text-xs font-semibold uppercase tracking-wider text-[#A1A1AA]">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-xl border border-white/10 bg-black/20 px-3.5 py-2.5 text-sm text-white placeholder:text-[#52525B] outline-none transition-colors focus:border-white/30"
+      />
+      {error && <p className="text-[11px] text-zinc-400">{error}</p>}
+    </div>
+  );
+}
+
+export default Contact;

@@ -70,6 +70,72 @@
   border: 1px solid rgba(63, 63, 70, 0.7);
 }
 
+.admin-theme {
+  background:
+    radial-gradient(circle at 92% 0%, rgba(255, 255, 255, 0.055), transparent 28rem),
+    #000000;
+  color: #ffffff;
+}
+
+.admin-theme ::selection {
+  background: #ffffff;
+  color: #000000;
+}
+
+/* Keep the dashboard theme scoped so switching it never changes the public portfolio. */
+.admin-theme.admin-light {
+  background: #f4f4f5 !important;
+  color: #18181b !important;
+}
+
+.admin-theme.admin-light [class*="bg-[#000000]"],
+.admin-theme.admin-light [class*="bg-[#050505]"],
+.admin-theme.admin-light [class*="bg-[#0A0A0B]"],
+.admin-theme.admin-light [class*="bg-[#0C0C0C]"],
+.admin-theme.admin-light [class*="bg-[#18181B]"],
+.admin-theme.admin-light [class*="bg-black/"] {
+  background-color: #ffffff !important;
+}
+
+.admin-theme.admin-light [class*="bg-white/5"],
+.admin-theme.admin-light [class*="bg-white/6"],
+.admin-theme.admin-light [class*="bg-white/8"],
+.admin-theme.admin-light [class*="bg-white/10"] {
+  background-color: #f4f4f5 !important;
+}
+
+.admin-theme.admin-light [class~="text-white"],
+.admin-theme.admin-light [class*="text-zinc-200"],
+.admin-theme.admin-light [class*="text-zinc-300"] {
+  color: #18181b !important;
+}
+
+.admin-theme.admin-light [class*="text-zinc-400"],
+.admin-theme.admin-light [class*="text-zinc-500"] {
+  color: #52525b !important;
+}
+
+.admin-theme.admin-light [class*="text-zinc-600"] {
+  color: #71717a !important;
+}
+
+.admin-theme.admin-light [class*="border-white"],
+.admin-theme.admin-light [class*="border-[#1F1F1F]"] {
+  border-color: #e4e4e7 !important;
+}
+
+.admin-theme.admin-light input,
+.admin-theme.admin-light textarea,
+.admin-theme.admin-light select {
+  color: #18181b !important;
+  caret-color: #18181b;
+}
+
+.admin-theme.admin-light input::placeholder,
+.admin-theme.admin-light textarea::placeholder {
+  color: #71717a !important;
+}
+
 /* Custom 3D & Animation utilities */
 .perspective-1000 {
   perspective: 1000px;
@@ -118,6 +184,15 @@
   }
 }
 
+.name-letter {
+  display: inline-block;
+  transition: opacity 120ms ease;
+}
+
+.surname-glow {
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.7), 0 0 34px rgba(255, 255, 255, 0.3);
+}
+
 .animate-referrals-marquee {
   display: flex;
   width: max-content;
@@ -156,7 +231,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Skills marquee — four seamless horizontal moving rows               */
+/* Technology marquee — seamless horizontal moving rows                 */
 /* ------------------------------------------------------------------ */
 
 @keyframes marqueeForward {
@@ -207,5 +282,9 @@
 @media (prefers-reduced-motion: reduce) {
   .marquee-row {
     animation: none !important;
+  }
+
+  .name-letter {
+    transition: none;
   }
 }

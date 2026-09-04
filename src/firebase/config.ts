@@ -1,5 +1,6 @@
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
+import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics';
+import { browserLocalPersistence, getAuth, setPersistence, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
@@ -18,11 +19,13 @@ const config = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined,
   appId: import.meta.env.VITE_FIREBASE_APP_ID as string | undefined,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string | undefined,
 };
 
 /**
  * Returns true only when a usable Firebase project has been configured.
- * Without a project id and API key none of the Firebase services can work.
+ * Authentication and Firestore only need the core Firebase app settings.
+ * Storage remains optional until an image upload is requested.
  */
 export function isFirebaseConfigured(): boolean {
   return Boolean(config.apiKey && config.authDomain && config.projectId);
@@ -32,13 +35,26 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
+let analytics: Analytics | null = null;
+
+function getFirebaseOptions(): FirebaseOptions {
+  return {
+    apiKey: config.apiKey!,
+    authDomain: config.authDomain!,
+    projectId: config.projectId!,
+    storageBucket: config.storageBucket!,
+    messagingSenderId: config.messagingSenderId!,
+    appId: config.appId!,
+    measurementId: config.measurementId,
+  };
+}
 
 function requireApp(): FirebaseApp {
   if (!app) {
     if (!isFirebaseConfigured()) {
       throw new Error('Firebase is not configured. Add your VITE_FIREBASE_* environment variables.');
     }
-    app = initializeApp(config);
+    app = initializeApp(getFirebaseOptions());
   }
   return app;
 }
@@ -50,6 +66,12 @@ export function getFirebaseAuth(): Auth {
   }
   return auth;
 }
+
+/** Keep the signed-in account available after a browser refresh. */
+export async function persistFirebaseAuth(): Promise<void> {
+  await setPersistence(getFirebaseAuth(), browserLocalPersistence);
+}
+
 
 /** Lazily-initialized Firestore instance. */
 export function getFirestoreDB(): Firestore {
@@ -65,6 +87,28 @@ export function getFirebaseStorage(): FirebaseStorage {
     storage = getStorage(requireApp());
   }
   return storage;
+}
+
+/**
+ * Firebase Analytics is optional. If a measurement ID is provided we try to
+ * initialize it once in supported browsers and otherwise keep the app running
+ * normally.
+ */
+export async function getFirebaseAnalytics(): Promise<Analytics | null> {
+  if (analytics) {
+    return analytics;
+  }
+
+  if (!isFirebaseConfigured() || !config.measurementId) {
+    return null;
+  }
+
+  if (!(await isSupported())) {
+    return null;
+  }
+
+  analytics = getAnalytics(requireApp());
+  return analytics;
 }
 
 /** Firebase configuration errors are never silent — include a useful hint. */

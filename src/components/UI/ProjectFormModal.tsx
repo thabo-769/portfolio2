@@ -147,6 +147,7 @@ export const ProjectFormModal: React.FC<ProjectFormModalProps> = ({
       liveUrl: liveUrl.trim(),
       status: editingProject?.status ?? 'Completed',
       featured: editingProject?.featured ?? false,
+      displayOrder: editingProject?.displayOrder ?? now,
       completionDate: editingProject?.completionDate ?? new Date(now).toISOString(),
       client: editingProject?.client ?? '',
       projectType: editingProject?.projectType ?? '',

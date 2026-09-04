@@ -1,6 +1,7 @@
 import React from 'react';
 import { Code2, Smartphone, Sparkles } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { usePortfolioCms } from '../../context/PortfolioCmsContext';
 import thaboPortrait from '../../assets/images/thabo_portrait.jpg';
 
 interface AboutProps {
@@ -9,110 +10,91 @@ interface AboutProps {
 
 export const About: React.FC<AboutProps> = () => {
   const { playSound } = useTheme();
+  const { content } = usePortfolioCms();
 
   return (
     <section
       id="about"
       aria-label="About section"
-      className="relative py-28 sm:py-36 bg-[#000000] text-white border-t border-[#1F1F1F] overflow-hidden text-left"
+      className="relative overflow-hidden border-t border-white/10 bg-[#000000] py-28 text-left text-white sm:py-36"
     >
-      {/* Ambient background glows */}
-      <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-[500px] h-[500px] bg-[#1F1F1F]/20 rounded-full blur-[180px] pointer-events-none" />
+      <div className="pointer-events-none absolute right-1/4 top-1/2 h-[500px] w-[500px] -translate-y-1/2 rounded-full bg-white/5 blur-[180px]" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-left">
-        
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center text-left">
-          
-          {/* Left Column: All Text & Information */}
-          <div className="lg:col-span-7 space-y-6 text-left">
-            
-            {/* Section Tag */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#0C0C0C] border border-[#1F1F1F] text-[11px] font-semibold uppercase tracking-[0.2em] text-[#A1A1AA] text-left">
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              <span>02 // WHAT I'M ALL ABOUT</span>
-            </div>
-
-            {/* Section Heading */}
-            <div className="space-y-2 text-left">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white uppercase text-left leading-[1.05]">
-                SIMPLY ABOUT ME
+      <div className="relative z-10 mx-auto max-w-7xl px-4 text-left sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 items-center gap-10 text-left lg:grid-cols-12 lg:gap-14">
+          <div className="space-y-6 text-left lg:col-span-7">
+            <div className="space-y-3">
+              <h2 className="text-3xl font-bold uppercase leading-[1.05] tracking-tight text-white sm:text-4xl md:text-5xl">
+                About
               </h2>
-              <p className="text-xs sm:text-sm md:text-base text-[#A1A1AA] font-normal leading-relaxed text-left">
-                Hi, I'm <span className="text-white font-semibold">Thabo Tshabangu</span> — a software developer with 3+ years of experience engineering fast web applications, interactive 3D WebGL scenes, and cross-platform mobile products.
+              <p className="max-w-3xl text-sm leading-relaxed text-[#A1A1AA] sm:text-base">
+                {content.about.description}
               </p>
             </div>
 
-            {/* Core Craft Highlights */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1 text-left">
-              <div className="p-4 rounded-2xl bg-[#0C0C0C]/85 border border-[#1F1F1F] hover:border-[#3F3F46] transition-all space-y-1.5 text-left">
-                <div className="flex items-center gap-2 text-left">
-                  <div className="p-1.5 rounded-lg bg-[#000000] border border-[#1F1F1F] text-white">
-                    <Code2 className="w-3.5 h-3.5" />
-                  </div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-                    Full-Stack Web
-                  </h4>
-                </div>
-                <p className="text-[11px] text-[#A1A1AA] leading-relaxed text-left">
-                  Modern React, TypeScript, and Node.js built for speed and resilience.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#0C0C0C]/85 border border-[#1F1F1F] hover:border-[#3F3F46] transition-all space-y-1.5 text-left">
-                <div className="flex items-center gap-2 text-left">
-                  <div className="p-1.5 rounded-lg bg-[#000000] border border-[#1F1F1F] text-white">
-                    <Smartphone className="w-3.5 h-3.5" />
-                  </div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-                    3D & Mobile
-                  </h4>
-                </div>
-                <p className="text-[11px] text-[#A1A1AA] leading-relaxed text-left">
-                  Interactive Three.js graphics and native-grade React Native apps.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#0C0C0C]/85 border border-[#1F1F1F] hover:border-[#3F3F46] transition-all space-y-1.5 text-left">
-                <div className="flex items-center gap-2 text-left">
-                  <div className="p-1.5 rounded-lg bg-[#000000] border border-[#1F1F1F] text-white">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">
-                    Clean Execution
-                  </h4>
-                </div>
-                <p className="text-[11px] text-[#A1A1AA] leading-relaxed text-left">
-                  Writing maintainable, type-safe code that delivers results effortlessly.
-                </p>
-              </div>
+            <div className="grid grid-cols-1 gap-3.5 pt-1 text-left sm:grid-cols-3">
+              <HighlightCard
+                icon={<Code2 className="h-3.5 w-3.5" />}
+                title="Full-stack web"
+                body={content.about.introduction}
+              />
+              <HighlightCard
+                icon={<Smartphone className="h-3.5 w-3.5" />}
+                title="3D and mobile"
+                body="Interactive Three.js graphics and high-performance mobile products."
+              />
+              <HighlightCard
+                icon={<Sparkles className="h-3.5 w-3.5" />}
+                title="Clean execution"
+                body={content.about.otherInfo}
+              />
             </div>
 
+            <div className="rounded-3xl border border-white/10 bg-[#0C0C0C]/85 p-5 text-sm leading-relaxed text-zinc-300">
+              {content.about.biography}
+            </div>
           </div>
 
-          {/* Right Column: Picture of Thabo */}
-          <div className="lg:col-span-5 flex justify-center lg:justify-end text-left">
-            <div 
+          <div className="flex justify-center lg:col-span-5 lg:justify-end">
+            <div
               onMouseEnter={() => playSound('hover')}
-              className="group relative w-full max-w-sm rounded-3xl p-3 bg-[#0C0C0C]/90 border border-[#1F1F1F] hover:border-[#3F3F46] shadow-[0_0_50px_rgba(0,0,0,0.9)] transition-all duration-500 hover:scale-[1.02] text-left"
+              className="group relative w-full max-w-sm rounded-3xl border border-white/10 bg-[#0C0C0C]/90 p-3 shadow-[0_0_50px_rgba(0,0,0,0.9)] transition-all duration-500 hover:scale-[1.02]"
             >
-              {/* Subtle top highlight */}
-              <div className="absolute top-0 left-10 right-10 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-
-              {/* Portrait Frame */}
-              <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-[#18181B] text-left">
+              <div className="absolute left-10 right-10 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+              <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-[#18181B]">
                 <img
                   src={thaboPortrait}
-                  alt="Thabo Tshabangu - Software Developer"
+                  alt={content.portfolioName}
                   referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                 />
               </div>
             </div>
           </div>
-
         </div>
-
       </div>
     </section>
   );
 };
+
+function HighlightCard({
+  icon,
+  title,
+  body,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="space-y-1.5 rounded-2xl border border-white/10 bg-[#0C0C0C]/85 p-4 transition-all hover:border-white/20">
+      <div className="flex items-center gap-2">
+        <div className="rounded-lg border border-white/10 bg-black p-1.5 text-white">{icon}</div>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-white">{title}</h4>
+      </div>
+      <p className="text-[11px] leading-relaxed text-[#A1A1AA]">{body}</p>
+    </div>
+  );
+}
+
+export default About;

@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Box, ExternalLink, Github, Star, Loader2, FolderKanban } from 'lucide-react';
 import { Project } from '../../types';
 import { useProjects } from '../../hooks/useProjects';
+import { usePortfolioCms } from '../../context/PortfolioCmsContext';
 
 /** Public Projects section — a clean, read-only showcase from Firebase. */
 export const Projects: React.FC = () => {
-  const { published, loading, error, notConfigured } = useProjects();
+  const { published, loading, error } = useProjects();
+  const { trackEvent } = usePortfolioCms();
   const [selected, setSelected] = useState<Project | null>(null);
 
   useEffect(() => {
@@ -22,7 +24,7 @@ export const Projects: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const showEmpty = !loading && (notConfigured || error !== null || published.length === 0);
+  const showEmpty = !loading && (error !== null || published.length === 0);
 
   const renderEmpty = () => (
     <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 mt-10">
@@ -58,7 +60,7 @@ export const Projects: React.FC = () => {
 
       {showEmpty && renderEmpty()}
 
-      {!loading && !notConfigured && error === null && published.length > 0 && (
+      {!loading && error === null && published.length > 0 && (
         <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 mt-12">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {published.map((project, index) => (
@@ -67,7 +69,10 @@ export const Projects: React.FC = () => {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, delay: (index % 3) * 0.08 }}
-                onClick={() => setSelected(project)}
+                onClick={() => {
+                  void trackEvent({ type: 'project_view', projectId: project.id, label: project.name });
+                  setSelected(project);
+                }}
                 className="group text-left bg-[#0C0C0C] rounded-2xl overflow-hidden border border-[#1F1F1F] hover:border-white/60 transition-all cursor-pointer hover:shadow-[0_12px_40px_-12px_rgba(255,255,255,0.25)]"
               >
                 <div className="relative h-52 bg-[#111113] overflow-hidden">
@@ -160,6 +165,7 @@ export const Projects: React.FC = () => {
                     href={selected.githubUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => void trackEvent({ type: 'github_click', projectId: selected.id, label: selected.name })}
                     className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
                       selected.githubUrl ? 'bg-white hover:bg-zinc-200 text-black shadow-lg shadow-black/20' : 'bg-[#18181B] text-[#71717A] pointer-events-none'
                     }`}
@@ -170,6 +176,7 @@ export const Projects: React.FC = () => {
                     href={selected.liveUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => void trackEvent({ type: 'live_click', projectId: selected.id, label: selected.name })}
                     className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
                       selected.liveUrl ? 'bg-white hover:bg-zinc-200 text-black shadow-md' : 'bg-[#18181B] text-[#71717A] pointer-events-none'
                     }`}

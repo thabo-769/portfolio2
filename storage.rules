@@ -13,7 +13,12 @@ service firebase.storage {
       allow read: if true;
     }
 
-    // Project images under /projects.
+    // Uploaded project images are stored under /media by the CMS.
+    match /media/{allPaths=**} {
+      allow write: if request.auth != null;
+    }
+
+    // Keep compatibility with older uploads stored under /projects.
     match /projects/{allPaths=**} {
       allow write: if request.auth != null;
     }

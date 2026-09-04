@@ -1,9 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Project } from '../types';
-import {
-  subscribeToProjects,
-} from '../firebase/projectsService';
-import { isFirebaseConfigured } from '../firebase/config';
+import { usePortfolioCms } from '../context/PortfolioCmsContext';
 
 export interface ProjectCollectionState {
   all: Project[];
@@ -24,38 +21,16 @@ export interface ProjectCollectionState {
  *   without a page refresh.
  */
 export function useProjects(): ProjectCollectionState {
-  const notConfigured = !isFirebaseConfigured();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (notConfigured) {
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    let unsub: (() => void) | undefined;
-    setLoading(true);
-    try {
-      unsub = subscribeToProjects((list, err) => {
-        setProjects(list);
-        setError(err);
-        setLoading(false);
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to initialize Firebase.');
-      setLoading(false);
-    }
-    return () => {
-      unsub?.();
-    };
-  }, [notConfigured]);
+  const { projects, loading, errors, notConfigured } = usePortfolioCms();
 
   return useMemo(() => {
     const active = projects.filter(p => !p.isDeleted);
     const trash = projects.filter(p => p.isDeleted);
-    const published = active.filter(p => p.status === 'Published');
-    return { all: projects, active, trash, published, loading, error, notConfigured };
-  }, [projects, loading, error, notConfigured]);
+    const published = active
+      .filter(p => p.status === 'Published')
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    const sortedActive = [...active].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+    const sortedTrash = [...trash].sort((a, b) => (b.deletedAt ?? b.updatedAt ?? 0) - (a.deletedAt ?? a.updatedAt ?? 0));
+    return { all: projects, active: sortedActive, trash: sortedTrash, published, loading, error: errors.projects, notConfigured };
+  }, [projects, loading, errors.projects, notConfigured]);
 }

@@ -1,109 +1,51 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeftRight, Loader2, LockKeyhole } from 'lucide-react';
 import { DashboardLayout, AdminSection } from './DashboardLayout';
 import { Overview } from './Overview';
 import { ProjectsManager } from './ProjectsManager';
-import { ProjectForm, ProjectSavePayload } from './ProjectForm';
-import { SkillsSection } from './SkillsSection';
-import { PortfolioSection } from './PortfolioSection';
+import { ProjectForm } from './ProjectForm';
+import { ContentSection } from './ContentSection';
+import { MessagesSection } from './MessagesSection';
+import { AnalyticsSection } from './AnalyticsSection';
+import { ActivitySection } from './ActivitySection';
+import { GlobalSearchResults } from './GlobalSearchResults';
 import { Trash } from './Trash';
 import { SettingsSection } from './SettingsSection';
-import { useProjects } from '../hooks/useProjects';
+import { usePortfolioCms } from '../context/PortfolioCmsContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './ToastContext';
-import { Project } from '../types';
-import {
-  createProject,
-  updateProject,
-  trashProject,
-  restoreProject,
-  permanentlyDeleteProject,
-  uploadProjectImage,
-} from '../firebase/projectsService';
+import type { Project } from '../types';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signOut, isConfigured } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
-  const { all, active, trash, loading, error, notConfigured } = useProjects();
+  const { settings, projects, messages, loading: cmsLoading, notConfigured } = usePortfolioCms();
 
   const [section, setSection] = useState<AdminSection>('overview');
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Project | null>(null);
+  const [projectFormOpen, setProjectFormOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [demoMode] = useState<boolean>(() => !import.meta.env.VITE_FIREBASE_API_KEY);
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [unlocked, setUnlocked] = useState(false);
 
-  const openAdd = () => {
-    setEditing(null);
-    setFormOpen(true);
+  const unreadCount = useMemo(
+    () => messages.filter(message => !message.read && !message.archived).length,
+    [messages]
+  );
+
+  const projectCount = useMemo(() => projects.filter(project => !project.isDeleted).length, [projects]);
+  const trashCount = useMemo(() => projects.filter(project => project.isDeleted).length, [projects]);
+
+  const openAddProject = () => {
+    setEditingProject(null);
+    setProjectFormOpen(true);
   };
 
-  const openEdit = (project: Project) => {
-    setEditing(project);
-    setFormOpen(true);
-  };
-
-  const handleSave = async (payload: ProjectSavePayload, reportProgress: (pct: number) => void) => {
-    if (!isConfigured) throw new Error('Firebase is not configured yet.');
-    let imageUrl = editing?.image && !editing.image.startsWith('gs://') ? editing.image : '';
-
-    if (payload.imageFile) {
-      reportProgress(10);
-      const hint = editing?.id ?? 'new';
-      const { promise } = uploadProjectImage(payload.imageFile, hint);
-      reportProgress(35);
-      imageUrl = await promise;
-      reportProgress(90);
-    }
-
-    if (editing) {
-      await updateProject(
-        {
-          ...editing,
-          name: payload.name,
-          description: payload.description,
-          category: payload.category,
-          technologies: payload.technologies,
-          githubUrl: payload.githubUrl,
-          liveUrl: payload.liveUrl,
-          featured: payload.featured,
-          status: payload.status,
-          image: imageUrl || editing.image,
-        },
-        imageUrl === editing.image ? '' : imageUrl
-      );
-    } else {
-      await createProject(payload, imageUrl);
-    }
-    reportProgress(100);
-
-    setFormOpen(false);
-    setEditing(null);
-  };
-
-  const handleTrash = async (project: Project) => {
-    try {
-      await trashProject(project.id);
-      toast('Project moved to trash.', 'success');
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not move project to trash.', 'error');
-    }
-  };
-
-  const handleRestore = async (project: Project) => {
-    try {
-      await restoreProject(project.id);
-      toast('Project restored successfully.', 'success');
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not restore project.', 'error');
-    }
-  };
-
-  const handlePermanentDelete = async (project: Project) => {
-    try {
-      await permanentlyDeleteProject(project);
-      toast('Project permanently deleted.', 'info');
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not permanently delete project.', 'error');
-    }
+  const openEditProject = (project: Project) => {
+    setEditingProject(project);
+    setProjectFormOpen(true);
   };
 
   const handleLogout = async () => {
@@ -113,55 +55,43 @@ export const AdminDashboard: React.FC = () => {
     }
     await signOut();
     toast('Signed out successfully.', 'info');
-    navigate('/admin');
+    navigate('/');
   };
+
+  const loading = cmsLoading;
+
+  if (loading) {
+    return (
+      <div className="admin-theme flex min-h-screen items-center justify-center bg-[#000000] text-white">
+        <Loader2 className="h-7 w-7 animate-spin text-white" />
+      </div>
+    );
+  }
+
+  if (!unlocked) {
+    return <DashboardUnlock onUnlock={() => setUnlocked(true)} />;
+  }
 
   const renderSection = () => {
     switch (section) {
       case 'overview':
-        return <Overview projects={all} loading={loading} onNavigate={setSection} />;
+        return <Overview onNavigate={setSection} />;
       case 'projects':
-        return (
-          <ProjectsManager
-            projects={active}
-            loading={loading}
-            onAdd={openAdd}
-            onEdit={openEdit}
-            onTrash={(p) => void handleTrash(p)}
-          />
-        );
-      case 'add-project':
-        return formOpen ? null : (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-[#111827]">Add Project</h1>
-              <p className="text-sm text-[#6B7280] mt-1">Publish a new project to your public portfolio.</p>
-            </div>
-            <button
-              onClick={openAdd}
-              className="px-6 py-3 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-sm font-semibold transition-all cursor-pointer"
-            >
-              Start creating a project
-            </button>
-          </div>
-        );
-      case 'skills':
-        return <SkillsSection skillCount={14} />;
-      case 'portfolio':
-        return <PortfolioSection />;
+        return <ProjectsManager onEdit={openEditProject} />;
+      case 'content':
+        return <ContentSection />;
+      case 'messages':
+        return <MessagesSection />;
+      case 'analytics':
+        return <AnalyticsSection />;
+      case 'activity':
+        return <ActivitySection />;
       case 'trash':
-        return (
-          <Trash
-            projects={trash}
-            loading={loading}
-            onRestore={(p) => void handleRestore(p)}
-            onPermanentDelete={(p) => void handlePermanentDelete(p)}
-          />
-        );
+        return <Trash />;
       case 'settings':
         return <SettingsSection />;
       default:
-        return <Overview projects={all} loading={loading} onNavigate={setSection} />;
+        return <Overview onNavigate={setSection} />;
     }
   };
 
@@ -169,29 +99,103 @@ export const AdminDashboard: React.FC = () => {
     <DashboardLayout
       active={section}
       onNavigate={setSection}
-      projectCount={active.length}
-      trashCount={trash.length}
+      onQuickAdd={openAddProject}
+      projectCount={projectCount}
+      trashCount={trashCount}
+      unreadCount={unreadCount}
+      searchValue={globalSearch}
+      onSearchChange={setGlobalSearch}
+      statusLabel={settings.availabilityStatus}
       onLogout={handleLogout}
     >
-      {(notConfigured || error) && (
-        <div className="mb-6 p-4 rounded-xl bg-[#FEF9C3] border border-[#FDE68A] text-sm text-[#92400E]">
-          {notConfigured
-            ? 'Firebase is not configured. Add your VITE_FIREBASE_* environment variables to enable project management.'
-            : error}
+      {demoMode && (
+        <div className="mb-6 rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
+          Firebase is not configured, so the dashboard is running in local demo mode. Connect Firebase to enable protected authentication and persistent cloud sync.
         </div>
+      )}
+
+      {notConfigured && !demoMode && (
+        <div className="mb-6 rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
+          Firebase is not configured. Cloud sync is disabled until the environment variables are added.
+        </div>
+      )}
+
+      {globalSearch.trim() && (
+        <GlobalSearchResults
+          query={globalSearch}
+          onNavigate={sectionId => {
+            setSection(sectionId);
+            if (sectionId !== section) {
+              setGlobalSearch('');
+            }
+          }}
+        />
       )}
 
       {renderSection()}
 
-      {formOpen && (
+      {projectFormOpen && (
         <ProjectForm
-          editing={editing}
-          onClose={() => { setFormOpen(false); setEditing(null); }}
-          onSave={handleSave}
+          editing={editingProject}
+          onClose={() => {
+            setProjectFormOpen(false);
+            setEditingProject(null);
+          }}
         />
       )}
     </DashboardLayout>
   );
 };
+
+function DashboardUnlock({ onUnlock }: { onUnlock: () => void }) {
+  const startX = useRef<number | null>(null);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    startX.current = event.clientX;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (startX.current === null) return;
+    const distance = event.clientX - startX.current;
+    startX.current = null;
+    if (Math.abs(distance) >= 70) onUnlock();
+  };
+
+  return (
+    <div
+      className="admin-theme flex min-h-screen touch-pan-y select-none items-center justify-center bg-[#000000] px-6 text-white"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => {
+        startX.current = null;
+      }}
+    >
+      <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#0C0C0C]/90 p-6 shadow-[0_0_60px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-8">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-[#0C0C0C] text-white shadow-[0_0_40px_rgba(255,255,255,0.08)]">
+          <LockKeyhole className="h-7 w-7" />
+        </div>
+        <p className="mt-6 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-[#71717A]">Welcome back</p>
+        <h1 className="mt-3 text-center text-3xl font-bold uppercase tracking-tight">Sign in</h1>
+        <p className="mt-3 text-center text-sm leading-relaxed text-[#A1A1AA]">Continue to your portfolio workspace.</p>
+
+        <form className="mt-7 space-y-4" onSubmit={event => event.preventDefault()}>
+          <label className="block space-y-2 text-left">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">Email</span>
+            <input type="email" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/30" placeholder="you@example.com" />
+          </label>
+          <label className="block space-y-2 text-left">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">Password</span>
+            <input type="password" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/30" placeholder="••••••••" />
+          </label>
+          <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-xs font-bold uppercase tracking-wider text-black">
+            Sign in
+            <ArrowLeftRight className="h-4 w-4" />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default AdminDashboard;

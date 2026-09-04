@@ -1,276 +1,401 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Search,
-  X,
-  Plus,
-  Pencil,
-  Trash2,
-  Star,
-  ExternalLink,
-  Github,
+  ArrowUpDown,
+  Eye,
   FolderKanban,
+  GripVertical,
   Loader2,
-  Clock,
   PackageOpen,
+  Pencil,
+  Search,
+  Star,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  X,
 } from 'lucide-react';
+import { usePortfolioCms } from '../context/PortfolioCmsContext';
+import { useToast } from './ToastContext';
 import { Project } from '../types';
+import { ProjectDetailModal } from '../components/UI/ProjectDetailModal';
 
-type FilterKey = 'all' | 'published' | 'draft' | 'featured';
-type SortKey = 'newest' | 'oldest' | 'az';
+type FilterKey = 'all' | 'personal' | 'business' | 'mobile' | 'gift' | 'published' | 'draft' | 'featured';
 
 interface ProjectsManagerProps {
-  projects: Project[];
-  loading: boolean;
-  onAdd: () => void;
   onEdit: (project: Project) => void;
-  onTrash: (project: Project) => void;
 }
 
-export const ProjectsManager: React.FC<ProjectsManagerProps> = ({
-  projects,
-  loading,
-  onAdd,
-  onEdit,
-  onTrash,
-}) => {
+export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
+  const { projects, loading, trashProject, toggleProjectFeatured, toggleProjectStatus, reorderProjects, logActivity } =
+    usePortfolioCms();
+  const { toast } = useToast();
+
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
-  const [sort, setSort] = useState<SortKey>('newest');
+  const [selected, setSelected] = useState<Project | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
 
-  const viewed = useMemo(() => {
-    let list = projects;
-    if (filter === 'published') list = list.filter(p => p.status === 'Published');
-    else if (filter === 'draft') list = list.filter(p => p.status === 'Draft');
-    else if (filter === 'featured') list = list.filter(p => p.featured);
+  const activeProjects = useMemo(
+    () => projects.filter(project => !project.isDeleted).sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
+    [projects]
+  );
 
-    const q = query.trim().toLowerCase();
-    if (q) {
-      list = list.filter(p => {
-        const hay = [
-          p.name,
-          p.description,
-          p.shortDescription,
-          p.category,
-          p.client,
-          p.projectType,
-          ...p.technologies,
-        ].join(' ').toLowerCase();
-        return hay.includes(q);
+  const filteredProjects = useMemo(() => {
+    let list = activeProjects;
+
+    if (filter === 'personal' || filter === 'business' || filter === 'mobile' || filter === 'gift') {
+      list = list.filter(project => project.category === filter.charAt(0).toUpperCase() + filter.slice(1));
+    } else if (filter === 'published') {
+      list = list.filter(project => project.status === 'Published');
+    } else if (filter === 'draft') {
+      list = list.filter(project => project.status === 'Draft');
+    } else if (filter === 'featured') {
+      list = list.filter(project => project.featured);
+    }
+
+    const term = query.trim().toLowerCase();
+    if (term) {
+      list = list.filter(project => {
+        const haystack = [
+          project.name,
+          project.shortDescription,
+          project.description,
+          project.category,
+          project.client,
+          project.projectType,
+          project.githubUrl,
+          project.liveUrl,
+          ...(project.technologies ?? []),
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(term);
       });
     }
 
-    const copy = [...list];
-    if (sort === 'oldest') copy.sort((a, b) => a.createdAt - b.createdAt);
-    else if (sort === 'az') copy.sort((a, b) => a.name.localeCompare(b.name));
-    else copy.sort((a, b) => b.createdAt - a.createdAt);
-    return copy;
-  }, [projects, query, filter, sort]);
+    return list;
+  }, [activeProjects, filter, query]);
 
-  const filters: { key: FilterKey; label: string }[] = [
+  const filters: Array<{ key: FilterKey; label: string }> = [
     { key: 'all', label: 'All' },
+    { key: 'personal', label: 'Personal' },
+    { key: 'business', label: 'Business' },
+    { key: 'mobile', label: 'Mobile' },
+    { key: 'gift', label: 'Gift' },
     { key: 'published', label: 'Published' },
     { key: 'draft', label: 'Draft' },
     { key: 'featured', label: 'Featured' },
   ];
 
+  const canReorder = filter === 'all' && !query.trim();
+
+  const handleDrop = async (targetId: string) => {
+    if (!dragId || dragId === targetId || !canReorder) return;
+    const next = [...filteredProjects];
+    const fromIndex = next.findIndex(project => project.id === dragId);
+    const toIndex = next.findIndex(project => project.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const reordered = [...activeProjects];
+    const dragged = reordered.findIndex(project => project.id === dragId);
+    const target = reordered.findIndex(project => project.id === targetId);
+    if (dragged < 0 || target < 0) return;
+
+    const [moved] = reordered.splice(dragged, 1);
+    reordered.splice(target, 0, moved);
+    await reorderProjects(reordered.map(project => project.id));
+    await logActivity({
+      action: 'Project reordered',
+      item: moved.name,
+      itemType: 'project',
+      user: 'Administrator',
+      details: `Moved from position ${dragged + 1} to ${target + 1}`,
+    });
+    toast('Project order updated.', 'success');
+    setDragId(null);
+  };
+
+  const handleToggleFeatured = async (project: Project) => {
+    await toggleProjectFeatured(project.id, !project.featured);
+    await logActivity({
+      action: project.featured ? 'Project unfeatured' : 'Project featured',
+      item: project.name,
+      itemType: 'project',
+      user: 'Administrator',
+    });
+    toast(project.featured ? 'Project unfeatured.' : 'Project featured.', 'info');
+  };
+
+  const handleToggleStatus = async (project: Project) => {
+    const nextStatus = project.status === 'Published' ? 'Draft' : 'Published';
+    await toggleProjectStatus(project.id, nextStatus);
+    await logActivity({
+      action: nextStatus === 'Published' ? 'Project published' : 'Project unpublished',
+      item: project.name,
+      itemType: 'project',
+      user: 'Administrator',
+    });
+    toast(nextStatus === 'Published' ? 'Project published.' : 'Project saved as draft.', 'success');
+  };
+
+  const handleTrash = async (project: Project) => {
+    await trashProject(project.id);
+    await logActivity({
+      action: 'Project moved to trash',
+      item: project.name,
+      itemType: 'project',
+      user: 'Administrator',
+    });
+    toast('Project moved to trash.', 'success');
+    if (selected?.id === project.id) setSelected(null);
+  };
+
+  const selectedIndex = selected ? filteredProjects.findIndex(project => project.id === selected.id) : -1;
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24 text-[#16A34A]">
-        <Loader2 className="w-6 h-6 animate-spin" />
+      <div className="flex items-center justify-center rounded-[1.75rem] border border-white/10 bg-white/5 py-20 text-zinc-300">
+        <Loader2 className="h-6 w-6 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#111827]">Projects</h1>
-          <p className="text-sm text-[#6B7280] mt-1">
-            {projects.length} project{projects.length === 1 ? '' : 's'} · synced with Firebase
+    <div className="space-y-6 text-white">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-400">
+            <FolderKanban className="h-3.5 w-3.5" />
+            Projects
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Project management</h1>
+          <p className="max-w-2xl text-sm leading-relaxed text-zinc-400">
+            Add, edit, publish, feature, reorder, and trash projects. The order here is the order that the public portfolio uses.
           </p>
         </div>
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-sm font-semibold shadow-lg shadow-[#16A34A]/30 transition-all hover:scale-[1.02] cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Add Project
-        </button>
+
       </div>
 
-      {/* Search + filters + sort */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7280]" />
+      <div className="flex flex-col gap-3 rounded-[1.75rem] border border-white/10 bg-white/5 p-4 lg:flex-row lg:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           <input
-            type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search by name, category, or technology…"
-            className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-[#D1D5DB] focus:border-[#16A34A] focus:ring-2 focus:ring-[#22C55E]/30 focus:outline-none text-sm bg-white text-[#111827] transition-all"
+            placeholder="Search projects"
+            className="w-full rounded-2xl border border-white/10 bg-black/20 py-3 pl-11 pr-10 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-white/25"
           />
           {query && (
             <button
               onClick={() => setQuery('')}
               aria-label="Clear search"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#16A34A] cursor-pointer"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-zinc-500 hover:bg-white/5 hover:text-white"
             >
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-xl border border-[#D1D5DB] bg-white p-1">
-          {filters.map(f => (
+        <div className="flex flex-wrap gap-2">
+          {filters.map(item => (
             <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                filter === f.key
-                  ? 'bg-[#16A34A] text-white'
-                  : 'text-[#6B7280] hover:bg-[#F0FDF4] hover:text-[#16A34A]'
+              key={item.key}
+              onClick={() => setFilter(item.key)}
+              className={`rounded-full border px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.16em] transition-all ${
+                filter === item.key
+                  ? 'border-white bg-white text-black'
+                  : 'border-white/10 bg-black/20 text-zinc-400 hover:bg-white/5 hover:text-white'
               }`}
             >
-              {f.label}
+              {item.label}
             </button>
           ))}
         </div>
-
-        <select
-          value={sort}
-          onChange={e => setSort(e.target.value as SortKey)}
-          className="px-3 py-2 rounded-xl border border-[#D1D5DB] bg-white text-sm text-[#374151] focus:border-[#16A34A] focus:outline-none cursor-pointer"
-          aria-label="Sort projects"
-        >
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="az">Alphabetical</option>
-        </select>
       </div>
 
-      {viewed.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-[#DCFCE7]">
-          <div className="p-4 rounded-2xl bg-[#F0FDF4] text-[#16A34A] mb-4">
-            <PackageOpen className="w-8 h-8" />
+      <div className="flex items-center gap-2 text-xs text-zinc-500">
+        <ArrowUpDown className="h-3.5 w-3.5" />
+        {canReorder ? 'Drag rows to reorder projects.' : 'Clear search and return to All to reorder projects.'}
+      </div>
+
+      {filteredProjects.length === 0 ? (
+        <div className="flex min-h-72 flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-white/10 bg-black/20 text-center">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-zinc-300">
+            <PackageOpen className="h-8 w-8" />
           </div>
-          <p className="font-semibold text-[#111827]">No projects found</p>
-          <p className="text-sm text-[#6B7280] mt-1 max-w-sm">
-            {query ? 'Try a different search.' : 'Add your first project to see it here and on your portfolio.'}
+          <p className="mt-4 text-sm font-medium text-white">No projects found</p>
+          <p className="mt-2 max-w-sm text-sm text-zinc-500">
+            {query ? 'Try a different search term.' : 'Create your first project to populate the dashboard and public portfolio.'}
           </p>
-          {!query && (
-            <button
-              onClick={onAdd}
-              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-sm font-semibold transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              Add Project
-            </button>
-          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {viewed.map((project, i) => (
-            <motion.div
-              key={project.id}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: (i % 6) * 0.04, duration: 0.3 }}
-              className="bg-white rounded-2xl border border-[#DCFCE7] shadow-sm overflow-hidden hover:shadow-lg transition-shadow"
-            >
-              <div className="relative h-36 bg-[#F0FDF4]">
-                {project.image && !project.image.startsWith('gs://') ? (
-                  <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[#16A34A]/40">
-                    <FolderKanban className="w-10 h-10" />
-                  </div>
-                )}
-                <div className="absolute top-2.5 right-2.5 flex gap-1.5">
-                  {project.featured && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#16A34A] text-white text-[10px] font-bold uppercase">
-                      <Star className="w-3 h-3 fill-current" /> Featured
-                    </span>
-                  )}
-                  <span
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                      project.status === 'Published'
-                        ? 'bg-[#DCFCE7] text-[#15803D]'
-                        : 'bg-[#F3F4F6] text-[#6B7280]'
+        <div className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-white/5">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-white/10">
+              <thead className="bg-black/30 text-left text-[11px] uppercase tracking-[0.22em] text-zinc-500">
+                <tr>
+                  <th className="px-4 py-4">Order</th>
+                  <th className="px-4 py-4">Project</th>
+                  <th className="px-4 py-4">Status</th>
+                  <th className="px-4 py-4">Featured</th>
+                  <th className="px-4 py-4">Tech</th>
+                  <th className="px-4 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {filteredProjects.map((project, index) => (
+                  <motion.tr
+                    key={project.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.03, duration: 0.2 }}
+                    draggable={canReorder}
+                    onDragStart={() => setDragId(project.id)}
+                    onDragEnd={() => setDragId(null)}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={() => void handleDrop(project.id)}
+                    className={`group bg-black/10 transition-colors hover:bg-white/5 ${
+                      dragId === project.id ? 'ring-1 ring-white/40' : ''
                     }`}
                   >
-                    {project.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-5">
-                <h3 className="font-bold text-[#111827] leading-tight">{project.name}</h3>
-                <p className="text-xs text-[#6B7280] mt-0.5">{project.category}</p>
-
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {project.technologies.slice(0, 3).map(tech => (
-                    <span key={tech} className="px-2 py-0.5 rounded-md bg-[#F0FDF4] text-[#15803D] text-[10px] font-semibold">
-                      {tech}
-                    </span>
-                  ))}
-                  {project.technologies.length > 3 && (
-                    <span className="px-2 py-0.5 rounded-md bg-[#F3F4F6] text-[#6B7280] text-[10px] font-semibold">
-                      +{project.technologies.length - 3}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between gap-2 mt-4 pt-4 border-t border-[#F0FDF4]">
-                  <div className="flex items-center gap-1.5 text-[11px] text-[#6B7280]">
-                    <Clock className="w-3.5 h-3.5" />
-                    {new Date(project.createdAt).toLocaleDateString()}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {project.githubUrl && (
-                      <a
-                        href={project.githubUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="GitHub"
-                        className="p-2 rounded-lg text-[#6B7280] hover:text-[#16A34A] hover:bg-[#F0FDF4]"
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          className="cursor-grab rounded-full border border-white/10 bg-white/5 p-2 text-zinc-400"
+                          aria-label="Drag to reorder"
+                          title="Drag to reorder"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+                        <span className="text-sm font-medium text-white">{project.displayOrder ?? index + 1}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex items-start gap-3">
+                        <div className="h-14 w-20 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+                          {project.image ? (
+                            <img src={project.image} alt={project.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-zinc-600">
+                              <FolderKanban className="h-5 w-5" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <button
+                            onClick={() => setSelected(project)}
+                            className="text-left text-sm font-semibold text-white transition-colors hover:text-zinc-300"
+                          >
+                            {project.name}
+                          </button>
+                          <p className="mt-1 line-clamp-2 max-w-xl text-sm text-zinc-400">
+                            {project.shortDescription || project.description}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-zinc-500">
+                            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                              {project.category}
+                            </span>
+                            {project.client && (
+                              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+                                {project.client}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <button
+                        onClick={() => void handleToggleStatus(project)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition-all ${
+                          project.status === 'Published'
+                            ? 'border-white/10 bg-white text-black'
+                            : 'border-white/10 bg-black/20 text-zinc-300 hover:bg-white/5'
+                        }`}
                       >
-                        <Github className="w-4 h-4" />
-                      </a>
-                    )}
-                    {project.liveUrl && (
-                      <a
-                        href={project.liveUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label="Live website"
-                        className="p-2 rounded-lg text-[#6B7280] hover:text-[#16A34A] hover:bg-[#F0FDF4]"
+                        {project.status}
+                      </button>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <button
+                        onClick={() => void handleToggleFeatured(project)}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300 transition-all hover:bg-white/5 hover:text-white"
                       >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    )}
-                    <button
-                      onClick={() => onEdit(project)}
-                      aria-label="Edit project"
-                      className="p-2 rounded-lg text-[#6B7280] hover:text-[#15803D] hover:bg-[#F0FDF4] cursor-pointer"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onTrash(project)}
-                      aria-label="Move to trash"
-                      className="p-2 rounded-lg text-[#6B7280] hover:text-[#374151] hover:bg-[#F3F4F6] cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+                        <Star className={`h-3.5 w-3.5 ${project.featured ? 'fill-white text-white' : ''}`} />
+                        {project.featured ? 'Featured' : 'Normal'}
+                      </button>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex max-w-xs flex-wrap gap-2">
+                        {project.technologies.slice(0, 4).map(tech => (
+                          <span
+                            key={tech}
+                            className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-300"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                        {project.technologies.length > 4 && (
+                          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-zinc-500">
+                            +{project.technologies.length - 4}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex justify-end gap-1">
+                        <button
+                          onClick={() => setSelected(project)}
+                          className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300 transition-all hover:bg-white hover:text-black"
+                          aria-label="Preview project"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => onEdit(project)}
+                          className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300 transition-all hover:bg-white hover:text-black"
+                          aria-label="Edit project"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => void handleTrash(project)}
+                          className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300 transition-all hover:bg-white hover:text-black"
+                          aria-label="Move project to trash"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
+      <ProjectDetailModal
+        project={selected}
+        onClose={() => setSelected(null)}
+        onEditProject={project => {
+          setSelected(null);
+          onEdit(project);
+        }}
+        onRequestDelete={project => void handleTrash(project)}
+        onPrev={() => {
+          if (selectedIndex > 0) setSelected(filteredProjects[selectedIndex - 1]);
+        }}
+        onNext={() => {
+          if (selectedIndex >= 0 && selectedIndex < filteredProjects.length - 1) {
+            setSelected(filteredProjects[selectedIndex + 1]);
+          }
+        }}
+        hasPrev={selectedIndex > 0}
+        hasNext={selectedIndex >= 0 && selectedIndex < filteredProjects.length - 1}
+      />
     </div>
   );
 };

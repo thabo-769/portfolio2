@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, Star, User, Building, HeartHandshake, CheckCircle } from 'lucide-react';
-import { saveReferral } from '../../data/referrals';
 import { Referral } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { usePortfolioCms } from '../../context/PortfolioCmsContext';
 import confetti from 'canvas-confetti';
 
 interface AddReferralModalProps {
@@ -13,6 +13,7 @@ interface AddReferralModalProps {
 
 export const AddReferralModal: React.FC<AddReferralModalProps> = ({ isOpen, onClose, onReferralAdded }) => {
   const { playSound } = useTheme();
+  const { saveReferral, logActivity } = usePortfolioCms();
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [organization, setOrganization] = useState('');
@@ -52,41 +53,66 @@ export const AddReferralModal: React.FC<AddReferralModalProps> = ({ isOpen, onCl
     playSound('click');
 
     setTimeout(() => {
-      const newRef = saveReferral({
+      const referral: Referral = {
+        id: `ref-${Date.now()}`,
         name: name.trim(),
+        clientName: name.trim(),
         role: role.trim(),
+        position: role.trim(),
         organization: organization.trim() || 'Independent Partner',
-        relationship: relationship.trim() || 'Professional Colleague',
+        company: organization.trim() || 'Independent Partner',
+        avatarUrl: `https://images.unsplash.com/photo-${1534528741775 + Math.floor(Math.random() * 50)}?auto=format&fit=crop&w=200&q=80`,
+        clientImage: `https://images.unsplash.com/photo-${1534528741775 + Math.floor(Math.random() * 50)}?auto=format&fit=crop&w=200&q=80`,
         message: message.trim(),
+        testimonial: message.trim(),
+        date: new Date().toLocaleDateString(),
+        relationship: relationship.trim() || 'Professional Colleague',
         rating,
-        avatarUrl: `https://images.unsplash.com/photo-${1534528741775 + Math.floor(Math.random() * 50)}?auto=format&fit=crop&w=200&q=80`
-      });
+        verified: false,
+        featured: false,
+        displayOrder: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        deletedAt: null,
+        isDeleted: false,
+      };
 
-      setSubmitting(false);
-      setSubmitted(true);
-      onReferralAdded(newRef);
-      playSound('success');
-
-      try {
-        confetti({
-          particleCount: 60,
-          spread: 60,
-          origin: { y: 0.6 },
-          colors: ['#FFFFFF', '#71717A', '#A1A1AA', '#3F3F46']
+      void saveReferral(referral).then(() => {
+        setSubmitting(false);
+        setSubmitted(true);
+        onReferralAdded(referral);
+        void logActivity({
+          action: 'Referral submitted',
+          item: referral.name,
+          itemType: 'referral',
+          user: referral.name,
         });
-      } catch {
-        // Fallback
-      }
+        playSound('success');
 
-      setTimeout(() => {
-        setSubmitted(false);
-        setName('');
-        setRole('');
-        setOrganization('');
-        setRelationship('');
-        setMessage('');
-        onClose();
-      }, 2000);
+        try {
+          confetti({
+            particleCount: 60,
+            spread: 60,
+            origin: { y: 0.6 },
+            colors: ['#FFFFFF', '#71717A', '#A1A1AA', '#3F3F46']
+          });
+        } catch {
+          // Fallback
+        }
+
+        setTimeout(() => {
+          setSubmitted(false);
+          setName('');
+          setRole('');
+          setOrganization('');
+          setRelationship('');
+          setMessage('');
+          onClose();
+        }, 2000);
+      }).catch(error => {
+        setSubmitting(false);
+        setError(error instanceof Error ? error.message : 'Unable to save referral.');
+      });
     }, 600);
   };
 

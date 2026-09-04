@@ -20,12 +20,19 @@ import {
 } from 'firebase/storage';
 import {
   onAuthStateChanged,
+  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
   signOut as fbSignOut,
   type User,
 } from 'firebase/auth';
 import { Project } from '../types';
 import { getFirebaseAuth, getFirestoreDB, getFirebaseStorage } from './config';
+
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -61,6 +68,21 @@ export async function signIn(email: string, password: string): Promise<User> {
   return credential.user;
 }
 
+
+export async function createAccount(email: string, password: string): Promise<User> {
+  const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+  return credential.user;
+}
+
+export async function signInWithGoogle(): Promise<User> {
+  const credential = await signInWithPopup(getFirebaseAuth(), googleProvider);
+  return credential.user;
+}
+
+export async function resetPassword(email: string): Promise<void> {
+  await sendPasswordResetEmail(getFirebaseAuth(), email);
+}
+
 export async function signOut(): Promise<void> {
   return fbSignOut(getFirebaseAuth());
 }
@@ -86,6 +108,7 @@ type StoredProject = {
   liveUrl: string;
   featured: boolean;
   status: string;
+  displayOrder: number;
   createdAt: unknown;
   updatedAt: unknown;
   deletedAt: unknown;
@@ -130,6 +153,7 @@ export function projectToStored(
     liveUrl: input.liveUrl,
     featured: input.featured,
     status: input.status,
+    displayOrder: now,
     shortDescription: input.shortDescription ?? input.description.slice(0, 160),
     client: input.client ?? '',
     projectType: input.projectType ?? '',
@@ -159,6 +183,7 @@ export function storedToProject(id: string, data: Record<string, unknown>): Proj
     liveUrl: String(data.liveUrl ?? ''),
     status: String(data.status ?? 'Published'),
     featured: Boolean(data.featured),
+    displayOrder: tsToNumber(data.displayOrder, Date.now()),
     completionDate: String(data.completionDate ?? ''),
     client: String(data.client ?? ''),
     projectType: String(data.projectType ?? ''),
@@ -221,6 +246,7 @@ export async function updateProject(project: Project, imageUrl = ''): Promise<vo
     liveUrl: project.liveUrl,
     featured: project.featured,
     status: project.status,
+    displayOrder: project.displayOrder,
     shortDescription: project.shortDescription || project.description.slice(0, 160),
     updatedAt: serverTimestamp(),
   };
