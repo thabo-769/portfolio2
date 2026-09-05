@@ -9,6 +9,7 @@ import { ContentSection } from './ContentSection';
 import { MessagesSection } from './MessagesSection';
 import { AnalyticsSection } from './AnalyticsSection';
 import { ActivitySection } from './ActivitySection';
+import { RemoteDevicesPage } from '../communication/remoteDevices/pages/RemoteDevicesPage';
 import { GlobalSearchResults } from './GlobalSearchResults';
 import { Trash } from './Trash';
 import { SettingsSection } from './SettingsSection';
@@ -19,7 +20,7 @@ import type { Project } from '../types';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signIn, signOut } = useAuth();
   const { toast } = useToast();
   const { settings, projects, messages, loading: cmsLoading, notConfigured } = usePortfolioCms();
 
@@ -69,7 +70,7 @@ export const AdminDashboard: React.FC = () => {
   }
 
   if (!unlocked) {
-    return <DashboardUnlock onUnlock={() => setUnlocked(true)} />;
+    return <DashboardUnlock demoMode={demoMode} onUnlock={() => setUnlocked(true)} signIn={signIn} />;
   }
 
   const renderSection = () => {
@@ -82,6 +83,8 @@ export const AdminDashboard: React.FC = () => {
         return <ContentSection />;
       case 'messages':
         return <MessagesSection />;
+      case 'remoteDevices':
+        return <RemoteDevicesPage />;
       case 'analytics':
         return <AnalyticsSection />;
       case 'activity':
@@ -147,15 +150,29 @@ export const AdminDashboard: React.FC = () => {
   );
 };
 
-function DashboardUnlock({ onUnlock }: { onUnlock: () => void }) {
+function DashboardUnlock({
+  demoMode,
+  onUnlock,
+  signIn,
+}: {
+  demoMode: boolean;
+  onUnlock: () => void;
+  signIn: (email: string, password: string) => Promise<unknown>;
+}) {
   const startX = useRef<number | null>(null);
+  const [email, setEmail] = useState(import.meta.env.VITE_ADMIN_EMAIL?.trim() || '');
+  const [password, setPassword] = useState(import.meta.env.VITE_ADMIN_PASSWORD || '');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
     startX.current = event.clientX;
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
     if (startX.current === null) return;
     const distance = event.clientX - startX.current;
     startX.current = null;
@@ -179,19 +196,59 @@ function DashboardUnlock({ onUnlock }: { onUnlock: () => void }) {
         <h1 className="mt-3 text-center text-3xl font-bold uppercase tracking-tight">Sign in</h1>
         <p className="mt-3 text-center text-sm leading-relaxed text-[#A1A1AA]">Continue to your portfolio workspace.</p>
 
-        <form className="mt-7 space-y-4" onSubmit={event => event.preventDefault()}>
+        <form className="mt-7 space-y-4" onSubmit={async event => {
+          event.preventDefault();
+          setError('');
+          const localAdminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase();
+          const localAdminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+          const matchesLocalCredentials =
+            localAdminEmail &&
+            localAdminPassword &&
+            email.trim().toLowerCase() === localAdminEmail &&
+            password === localAdminPassword;
+
+          if (matchesLocalCredentials) {
+            onUnlock();
+            return;
+          }
+
+          if (demoMode) {
+            onUnlock();
+            return;
+          }
+          setSubmitting(true);
+          try {
+            await signIn(email.trim(), password);
+            onUnlock();
+          } catch (signInError) {
+            const errorCode = signInError && typeof signInError === 'object' && 'code' in signInError
+              ? String((signInError as { code?: unknown }).code)
+              : '';
+            setError(
+              errorCode === 'auth/configuration-not-found'
+                ? 'Email and password sign-in is not enabled for this Firebase project.'
+                : signInError instanceof Error
+                  ? signInError.message
+                  : 'Sign in failed. Check your credentials and try again.'
+            );
+          } finally {
+            setSubmitting(false);
+          }
+        }}>
           <label className="block space-y-2 text-left">
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">Email</span>
-            <input type="email" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/30" placeholder="you@example.com" />
+            <input type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/30" placeholder="you@example.com" required />
           </label>
           <label className="block space-y-2 text-left">
             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">Password</span>
-            <input type="password" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/30" placeholder="••••••••" />
+            <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/30" placeholder="••••••••" required />
           </label>
-          <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-xs font-bold uppercase tracking-wider text-black">
-            Sign in
+          {error && <p className="rounded-2xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs leading-relaxed text-red-200">{error}</p>}
+          <button type="submit" disabled={submitting} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-xs font-bold uppercase tracking-wider text-black disabled:cursor-wait disabled:opacity-60">
+            {submitting ? 'Signing in...' : 'Sign in'}
             <ArrowLeftRight className="h-4 w-4" />
           </button>
+          {demoMode && <p className="text-center text-xs text-zinc-500">Demo mode: click Sign in to open the dashboard.</p>}
         </form>
       </div>
     </div>

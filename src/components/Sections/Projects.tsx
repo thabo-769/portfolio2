@@ -61,10 +61,11 @@ export const Projects: React.FC = () => {
       {showEmpty && renderEmpty()}
 
       {!loading && error === null && published.length > 0 && (
-        <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 mt-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="mx-auto mt-12 max-w-7xl px-6 sm:px-10 lg:px-14">
+          <div className="overflow-x-auto pb-5 [scrollbar-color:#52525b_transparent]">
+            <div className="grid w-max auto-cols-[minmax(300px,78vw)] grid-flow-col grid-rows-2 gap-8 auto-rows-fr sm:auto-cols-[minmax(360px,42vw)] lg:auto-cols-[420px] lg:gap-10">
             {published.map((project, index) => (
-              <motion.button
+              <motion.article
                 key={project.id}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -73,7 +74,15 @@ export const Projects: React.FC = () => {
                   void trackEvent({ type: 'project_view', projectId: project.id, label: project.name });
                   setSelected(project);
                 }}
-                className="group text-left bg-[#0C0C0C] rounded-2xl overflow-hidden border border-[#1F1F1F] hover:border-white/60 transition-all cursor-pointer hover:shadow-[0_12px_40px_-12px_rgba(255,255,255,0.25)]"
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelected(project);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#1F1F1F] bg-[#0C0C0C] text-left transition-all hover:border-white/60 hover:shadow-[0_12px_40px_-12px_rgba(255,255,255,0.25)]"
               >
                 <div className="relative h-52 bg-[#111113] overflow-hidden">
                   {project.image && !project.image.startsWith('gs://') ? (
@@ -87,7 +96,7 @@ export const Projects: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <div className="p-6">
+                <div className="flex flex-1 flex-col p-6">
                   <h3 className="text-lg font-semibold text-white uppercase tracking-tight group-hover:text-white transition-colors">{project.name}</h3>
                   <p className="mt-1 text-xs text-[#6B7280]">{project.category}</p>
                   <p className="mt-3 text-sm text-[#A1A1AA] leading-relaxed line-clamp-3">{project.shortDescription || project.description}</p>
@@ -99,9 +108,46 @@ export const Projects: React.FC = () => {
                       <span className="px-2 py-0.5 rounded-md bg-[#18181B] text-[#71717A] text-[10px] font-semibold">+{project.technologies.length - 4}</span>
                     )}
                   </div>
+                  <div className="mt-auto flex w-full gap-2 pt-5">
+                    <a
+                      href={project.githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={event => {
+                        event.stopPropagation();
+                        void trackEvent({ type: 'github_click', projectId: project.id, label: project.name });
+                      }}
+                      className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-all ${
+                        project.githubUrl
+                          ? 'bg-white text-black hover:bg-zinc-200'
+                          : 'pointer-events-none bg-[#18181B] text-[#71717A]'
+                      }`}
+                      aria-label={`View ${project.name} on GitHub`}
+                    >
+                      <Github className="h-3.5 w-3.5" /> GitHub
+                    </a>
+                    <a
+                      href={project.liveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={event => {
+                        event.stopPropagation();
+                        void trackEvent({ type: 'live_click', projectId: project.id, label: project.name });
+                      }}
+                      className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-all ${
+                        project.liveUrl
+                          ? 'border border-white/20 bg-white/10 text-white hover:bg-white hover:text-black'
+                          : 'pointer-events-none bg-[#18181B] text-[#71717A]'
+                      }`}
+                      aria-label={`View live ${project.name} website`}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> Live link
+                    </a>
+                  </div>
                 </div>
-              </motion.button>
+              </motion.article>
             ))}
+            </div>
           </div>
         </div>
       )}

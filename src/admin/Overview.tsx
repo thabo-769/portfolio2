@@ -10,6 +10,7 @@ import {
   Mail,
   Sparkles,
   Star,
+  TabletSmartphone,
   Trash2,
 } from 'lucide-react';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
@@ -216,17 +217,24 @@ export const Overview: React.FC<OverviewProps> = ({ onNavigate }) => {
                 <span>Manage projects</span>
                 <FolderKanban className="h-4 w-4 text-zinc-400" />
               </button>
-              <button
-                onClick={() => onNavigate('messages')}
-                className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
-              >
-                <span>Review inbox</span>
-                <Mail className="h-4 w-4 text-zinc-400" />
-              </button>
-              <button
-                onClick={() => onNavigate('analytics')}
-                className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
-              >
+            <button
+              onClick={() => onNavigate('messages')}
+              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
+            >
+              <span>Review inbox</span>
+              <Mail className="h-4 w-4 text-zinc-400" />
+            </button>
+            <button
+              onClick={() => onNavigate('remoteDevices')}
+              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
+            >
+              <span>Remote access</span>
+              <TabletSmartphone className="h-4 w-4 text-zinc-400" />
+            </button>
+            <button
+              onClick={() => onNavigate('analytics')}
+              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
+            >
                 <span>Inspect analytics</span>
                 <BarChart3 className="h-4 w-4 text-zinc-400" />
               </button>

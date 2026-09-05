@@ -40,8 +40,8 @@ function Portfolio() {
 
       <main id="main-content" className="flex-1">
         <Hero onOpenResume={() => setIsResumeOpen(true)} />
-        <About onOpenResume={() => setIsResumeOpen(true)} />
         <PrimaryTechStrip />
+        <About onOpenResume={() => setIsResumeOpen(true)} />
         <Projects />
         <Referrals />
         <Contact />

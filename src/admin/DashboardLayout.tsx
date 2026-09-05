@@ -16,6 +16,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  TabletSmartphone,
   Sun,
   Trash2,
   X,
@@ -27,6 +28,7 @@ export type AdminSection =
   | 'projects'
   | 'content'
   | 'messages'
+  | 'remoteDevices'
   | 'media'
   | 'analytics'
   | 'activity'
@@ -66,6 +68,7 @@ const NAV_GROUPS: Array<{
     label: 'Communication',
     items: [
       { id: 'messages', label: 'Messages', icon: <Mail className="h-4.5 w-4.5" /> },
+      { id: 'remoteDevices', label: 'Remote Access', icon: <TabletSmartphone className="h-4.5 w-4.5" /> },
     ],
   },
   {
@@ -99,6 +102,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 }) => {
   const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [lightMode, setLightMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('portfolio_admin_theme') === 'light';
@@ -122,6 +126,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const go = (section: AdminSection) => {
     setMobileOpen(false);
     onNavigate(section);
+  };
+
+  const openNavigation = () => {
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      setSidebarOpen(true);
+    } else {
+      setMobileOpen(true);
+    }
   };
 
   const navButton = (id: AdminSection, label: string, icon: React.ReactNode) => {
@@ -160,9 +172,21 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const sidebar = (
     <div className="flex h-full flex-col bg-[#000000] text-white">
       <div className="flex items-start gap-3 border-b border-white/10 px-5 py-5">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white text-black">
+        <button
+          type="button"
+          onClick={() => {
+            if (mobileOpen) {
+              setMobileOpen(false);
+            } else {
+              setSidebarOpen(false);
+            }
+          }}
+          aria-label="Close navigation sidebar"
+          title="Close navigation sidebar"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white text-black transition-transform hover:scale-105"
+        >
           <ShieldCheck className="h-5 w-5" />
-        </div>
+        </button>
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-[0.28em] text-[#71717A]">Private Control Center</p>
           <h1 className="mt-1 text-sm font-bold uppercase tracking-tight text-white">Portfolio Dashboard</h1>
@@ -211,9 +235,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <div className={`admin-theme min-h-screen bg-[#000000] text-white ${lightMode ? 'admin-light' : ''}`}>
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-white/10 lg:block">
-        {sidebar}
-      </aside>
+      {sidebarOpen && (
+        <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-white/10 lg:block">
+          {sidebar}
+        </aside>
+      )}
 
       {mobileOpen && (
         <div className="fixed inset-0 z-[80] lg:hidden">
@@ -231,14 +257,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         </div>
       )}
 
-      <div className="lg:pl-72">
+      <div className={sidebarOpen ? 'lg:pl-72' : ''}>
         <header className="sticky top-0 z-40 border-b border-white/10 bg-[#000000]/90 backdrop-blur-md">
           <div className="flex flex-col gap-3 px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setMobileOpen(true)}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-2 text-white lg:hidden"
+                  onClick={openNavigation}
+                  className={`rounded-2xl border border-white/10 bg-white/5 p-2 text-white ${sidebarOpen ? 'lg:hidden' : ''}`}
                   aria-label="Open navigation"
                 >
                   <Menu className="h-5 w-5" />
@@ -288,7 +314,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <input
                   value={searchValue}
                   onChange={e => onSearchChange(e.target.value)}
-                  placeholder="Search projects or messages"
+                  placeholder="Search projects, messages, or devices"
                   className="w-full rounded-2xl border border-white/10 bg-[#0C0C0C]/85 py-3 pl-11 pr-4 text-sm text-white placeholder:text-[#71717A] outline-none transition-all focus:border-white/30 focus:bg-[#18181B]"
                 />
               </div>

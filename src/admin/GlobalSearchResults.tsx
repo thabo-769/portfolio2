@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
-import { FolderKanban, Mail } from 'lucide-react';
+import React, { useMemo, useSyncExternalStore } from 'react';
+import { FolderKanban, Mail, TabletSmartphone } from 'lucide-react';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
 import { AdminSection } from './DashboardLayout';
+import { getRemoteDevicesState, subscribeRemoteDevicesState } from '../communication/remoteDevices/services/remoteDevicesStore';
 
 interface GlobalSearchResultsProps {
   query: string;
@@ -10,6 +11,7 @@ interface GlobalSearchResultsProps {
 
 export const GlobalSearchResults: React.FC<GlobalSearchResultsProps> = ({ query, onNavigate }) => {
   const { projects, messages } = usePortfolioCms();
+  const remoteDevices = useSyncExternalStore(subscribeRemoteDevicesState, getRemoteDevicesState, getRemoteDevicesState).devices;
 
   const term = query.trim().toLowerCase();
 
@@ -27,8 +29,15 @@ export const GlobalSearchResults: React.FC<GlobalSearchResultsProps> = ({ query,
       [message.senderName, message.email, message.subject, message.message].join(' ').toLowerCase().includes(term)
     );
 
-    return { projectMatches, messageMatches };
-  }, [term, projects, messages]);
+    const deviceMatches = remoteDevices.filter(device =>
+      [device.name, device.operatingSystem, device.type, device.connectionMethod, ...(device.connectionMethods ?? [])]
+        .join(' ')
+        .toLowerCase()
+        .includes(term)
+    );
+
+    return { projectMatches, messageMatches, deviceMatches };
+  }, [term, projects, messages, remoteDevices]);
 
   if (!results) return null;
 
@@ -44,6 +53,12 @@ export const GlobalSearchResults: React.FC<GlobalSearchResultsProps> = ({ query,
       label: 'Messages',
       icon: <Mail className="h-4 w-4" />,
       items: results.messageMatches.map(item => item.subject || item.senderName),
+    },
+    {
+      id: 'remoteDevices' as AdminSection,
+      label: 'Remote Access',
+      icon: <TabletSmartphone className="h-4 w-4" />,
+      items: results.deviceMatches.map(item => item.name),
     },
   ];
 
