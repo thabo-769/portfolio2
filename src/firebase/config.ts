@@ -22,9 +22,9 @@ const config = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string | undefined,
 };
 
-// Keep the dashboard free by default. Set VITE_FREE_DASHBOARD_ACCESS=false
-// when the project is ready to use authenticated Firebase cloud sync.
-const freeDashboardAccess = import.meta.env.VITE_FREE_DASHBOARD_ACCESS !== 'false';
+// Use Firebase whenever credentials are configured. Set VITE_FREE_DASHBOARD_ACCESS=true
+// only when intentionally running the local/demo dashboard without cloud sync.
+const freeDashboardAccess = import.meta.env.VITE_FREE_DASHBOARD_ACCESS === 'true';
 
 /**
  * Returns true only when a usable Firebase project has been configured.
