@@ -45,7 +45,10 @@ export const Projects: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div
+            className="mt-10 grid auto-cols-[minmax(82%,1fr)] grid-flow-col grid-rows-2 gap-4 overflow-x-auto pb-4 sm:auto-cols-[minmax(46%,1fr)] xl:auto-cols-[minmax(31%,1fr)]"
+            aria-label="Project collection"
+          >
             {published.map((project, index) => (
               <motion.article
                 key={project.id}
