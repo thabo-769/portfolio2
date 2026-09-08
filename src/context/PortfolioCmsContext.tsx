@@ -36,6 +36,7 @@ import {
   updateContentEntry,
   updateSettingsEntry,
   uploadMediaEntry,
+  uploadProjectImageEntry,
   upsertProject,
 } from '../firebase/cmsService';
 import { isFirebaseConfigured } from '../firebase/config';
@@ -77,6 +78,7 @@ interface PortfolioCmsContextValue {
     settings: string | null;
   };
   saveProject: (project: Project, imageUrl?: string) => Promise<string>;
+  uploadProjectImage: (file: File, projectId: string, onProgress?: (progress: number) => void) => Promise<{ url: string; path: string }>;
   trashProject: (projectId: string) => Promise<void>;
   restoreProject: (projectId: string) => Promise<void>;
   permanentlyDeleteProject: (project: Project) => Promise<void>;
@@ -216,13 +218,18 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       notConfigured,
       errors,
       saveProject: async (project: Project, imageUrl?: string) => {
-        await upsertProject(project, imageUrl);
+        await upsertProject(project, imageUrl, project.imagePath);
         setProjects(current => {
-          const next = [...current.filter(item => item.id !== project.id), { ...project, image: imageUrl ?? project.image }];
+          const next = [
+            ...current.filter(item => item.id !== project.id),
+            { ...project, image: imageUrl ?? project.image, imagePath: project.imagePath },
+          ];
           return next.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
         });
         return project.id;
       },
+      uploadProjectImage: async (file: File, projectId: string, onProgress?: (progress: number) => void) =>
+        uploadProjectImageEntry(file, projectId, onProgress),
       trashProject: async (projectId: string) => {
         await trashProjectEntry(projectId);
         setProjects(current => current.map(project =>

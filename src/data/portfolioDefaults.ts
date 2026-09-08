@@ -8,7 +8,7 @@ export const defaultPortfolioContent: PortfolioContent = {
     subtitle: 'SOFTWARE DEVELOPER',
     introduction:
       'Engineering resilient full-stack systems, spatial 3D WebGL interfaces, and high-performance mobile applications with strategic architectural rigor.',
-    ctaText: 'Explore Projects',
+    ctaText: "Let's Connect",
     availabilityStatus: 'Available for new opportunities',
   },
   about: {
@@ -26,8 +26,8 @@ export const defaultPortfolioContent: PortfolioContent = {
     phone: '+27 000 000 000',
     availabilityStatus: 'Open to new projects',
     socials: [
-      { label: 'GitHub', url: 'https://github.com/thabotshabangu' },
-      { label: 'LinkedIn', url: 'https://linkedin.com/in/thabo-tshabangu' },
+      { label: 'GitHub', url: 'https://github.com/thabo-769' },
+      { label: 'LinkedIn', url: 'https://www.linkedin.com/in/thabo-tshabangu' },
       { label: 'Email', url: 'mailto:thabolanez4@gmail.com' },
     ],
   },
@@ -41,8 +41,8 @@ export const defaultPortfolioSettings: PortfolioSettings = {
   phone: '+27 000 000 000',
   availabilityStatus: 'Available for new opportunities',
   socialLinks: [
-    { label: 'GitHub', url: 'https://github.com/thabotshabangu' },
-    { label: 'LinkedIn', url: 'https://linkedin.com/in/thabo-tshabangu' },
+    { label: 'GitHub', url: 'https://github.com/thabo-769' },
+    { label: 'LinkedIn', url: 'https://www.linkedin.com/in/thabo-tshabangu' },
   ],
   darkModeDefault: 'dark',
   dashboardPreferences: {

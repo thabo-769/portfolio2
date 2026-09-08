@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { Project } from '../types';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
-import { projectsData } from '../data/projects';
 
 export interface ProjectCollectionState {
   all: Project[];
@@ -30,7 +29,7 @@ export function useProjects(): ProjectCollectionState {
     const publishedFromCms = active
       .filter(p => p.status === 'Published')
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-    const published = publishedFromCms.length > 0 ? publishedFromCms : projectsData;
+    const published = publishedFromCms;
     const sortedActive = [...active].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     const sortedTrash = [...trash].sort((a, b) => (b.deletedAt ?? b.updatedAt ?? 0) - (a.deletedAt ?? a.updatedAt ?? 0));
     return { all: projects, active: sortedActive, trash: sortedTrash, published, loading, error: errors.projects, notConfigured };

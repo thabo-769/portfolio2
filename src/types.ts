@@ -29,6 +29,7 @@ export interface Project {
   category: ProjectCategory | (string & {});
   technologies: string[];
   image: string; // Main thumbnail / hero image
+  imagePath?: string; // Firebase Storage path used for cleanup
   images: string[]; // Additional gallery images
   githubUrl: string;
   liveUrl: string;

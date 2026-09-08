@@ -12,7 +12,6 @@ import {
   Mail,
   Menu,
   Moon,
-  Plus,
   Search,
   Settings,
   ShieldCheck,
@@ -25,8 +24,8 @@ import { useAuth } from '../context/AuthContext';
 
 export type AdminSection =
   | 'overview'
-  | 'projects'
   | 'content'
+  | 'projects'
   | 'messages'
   | 'remoteDevices'
   | 'media'
@@ -38,8 +37,6 @@ export type AdminSection =
 interface DashboardLayoutProps {
   active: AdminSection;
   onNavigate: (section: AdminSection) => void;
-  onQuickAdd: () => void;
-  projectCount: number;
   trashCount: number;
   unreadCount: number;
   searchValue: string;
@@ -60,8 +57,8 @@ const NAV_GROUPS: Array<{
   {
     label: 'Portfolio',
     items: [
-      { id: 'projects', label: 'Projects', icon: <FolderKanban className="h-4.5 w-4.5" /> },
       { id: 'content', label: 'Content', icon: <FileText className="h-4.5 w-4.5" /> },
+      { id: 'projects', label: 'Projects', icon: <FolderKanban className="h-4.5 w-4.5" /> },
     ],
   },
   {
@@ -90,8 +87,6 @@ const NAV_GROUPS: Array<{
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   active,
   onNavigate,
-  onQuickAdd,
-  projectCount,
   trashCount,
   unreadCount,
   searchValue,
@@ -158,11 +153,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {id === 'messages' && unreadCount > 0 && (
           <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-black">
             {unreadCount}
-          </span>
-        )}
-        {id === 'projects' && projectCount > 0 && (
-          <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-zinc-200">
-            {projectCount}
           </span>
         )}
       </button>
@@ -282,13 +272,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   {statusLabel}
                 </div>
                 <button
-                  onClick={onQuickAdd}
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_24px_rgba(255,255,255,0.18)] transition-all hover:bg-[#A1A1AA]"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Projects
-                </button>
-                <button
                   onClick={toggleLightMode}
                   aria-label={lightMode ? 'Use dark mode' : 'Use light mode'}
                   aria-pressed={lightMode}
@@ -314,19 +297,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <input
                   value={searchValue}
                   onChange={e => onSearchChange(e.target.value)}
-                  placeholder="Search projects, messages, or devices"
+                  placeholder="Search messages or remote devices"
                   className="w-full rounded-2xl border border-white/10 bg-[#0C0C0C]/85 py-3 pl-11 pr-4 text-sm text-white placeholder:text-[#71717A] outline-none transition-all focus:border-white/30 focus:bg-[#18181B]"
                 />
               </div>
 
               <div className="flex items-center gap-2 sm:hidden">
-                <button
-                  onClick={onQuickAdd}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-xs font-bold uppercase tracking-wider text-black"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Projects
-                </button>
                 <button
                   onClick={toggleLightMode}
                   aria-label={lightMode ? 'Use dark mode' : 'Use light mode'}

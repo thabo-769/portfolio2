@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeftRight, Loader2, LockKeyhole } from 'lucide-react';
 import { DashboardLayout, AdminSection } from './DashboardLayout';
 import { Overview } from './Overview';
+import { ContentSection } from './ContentSection';
 import { ProjectsManager } from './ProjectsManager';
 import { ProjectForm } from './ProjectForm';
-import { ContentSection } from './ContentSection';
 import { MessagesSection } from './MessagesSection';
 import { AnalyticsSection } from './AnalyticsSection';
 import { ActivitySection } from './ActivitySection';
@@ -20,34 +20,25 @@ import type { Project } from '../types';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signIn, signOut } = useAuth();
+  const { user, signIn, signOut, isAuthorized } = useAuth();
   const { toast } = useToast();
   const { settings, projects, messages, loading: cmsLoading, notConfigured } = usePortfolioCms();
 
   const [section, setSection] = useState<AdminSection>('overview');
+  const [demoMode] = useState<boolean>(() =>
+    import.meta.env.VITE_FREE_DASHBOARD_ACCESS !== 'false' || !import.meta.env.VITE_FIREBASE_API_KEY
+  );
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [unlocked, setUnlocked] = useState(demoMode);
   const [projectFormOpen, setProjectFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [demoMode] = useState<boolean>(() => !import.meta.env.VITE_FIREBASE_API_KEY);
-  const [globalSearch, setGlobalSearch] = useState('');
-  const [unlocked, setUnlocked] = useState(false);
 
   const unreadCount = useMemo(
     () => messages.filter(message => !message.read && !message.archived).length,
     [messages]
   );
 
-  const projectCount = useMemo(() => projects.filter(project => !project.isDeleted).length, [projects]);
   const trashCount = useMemo(() => projects.filter(project => project.isDeleted).length, [projects]);
-
-  const openAddProject = () => {
-    setEditingProject(null);
-    setProjectFormOpen(true);
-  };
-
-  const openEditProject = (project: Project) => {
-    setEditingProject(project);
-    setProjectFormOpen(true);
-  };
 
   const handleLogout = async () => {
     if (!user) {
@@ -61,6 +52,16 @@ export const AdminDashboard: React.FC = () => {
 
   const loading = cmsLoading;
 
+  const openAddProject = () => {
+    setEditingProject(null);
+    setProjectFormOpen(true);
+  };
+
+  const openEditProject = (project: Project) => {
+    setEditingProject(project);
+    setProjectFormOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="admin-theme flex min-h-screen items-center justify-center bg-[#000000] text-white">
@@ -73,14 +74,34 @@ export const AdminDashboard: React.FC = () => {
     return <DashboardUnlock demoMode={demoMode} onUnlock={() => setUnlocked(true)} signIn={signIn} />;
   }
 
+  if (!demoMode && !isAuthorized) {
+    return (
+      <div className="admin-theme flex min-h-screen items-center justify-center bg-[#000000] px-6 text-white">
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0C0C0C] p-8 text-center">
+          <h1 className="text-2xl font-semibold">Admin access required</h1>
+          <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+            This Firebase account is not authorized to manage portfolio data.
+          </p>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="mt-6 rounded-full bg-white px-5 py-3 text-sm font-semibold text-black"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const renderSection = () => {
     switch (section) {
       case 'overview':
         return <Overview onNavigate={setSection} />;
-      case 'projects':
-        return <ProjectsManager onEdit={openEditProject} />;
       case 'content':
         return <ContentSection />;
+      case 'projects':
+        return <ProjectsManager onAdd={openAddProject} onEdit={openEditProject} />;
       case 'messages':
         return <MessagesSection />;
       case 'remoteDevices':
@@ -102,8 +123,6 @@ export const AdminDashboard: React.FC = () => {
     <DashboardLayout
       active={section}
       onNavigate={setSection}
-      onQuickAdd={openAddProject}
-      projectCount={projectCount}
       trashCount={trashCount}
       unreadCount={unreadCount}
       searchValue={globalSearch}
@@ -113,7 +132,7 @@ export const AdminDashboard: React.FC = () => {
     >
       {demoMode && (
         <div className="mb-6 rounded-[1.5rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300">
-          Firebase is not configured, so the dashboard is running in local demo mode. Connect Firebase to enable protected authentication and persistent cloud sync.
+          Free dashboard mode is active. Changes are saved in this browser and do not require Firebase billing or admin authorization.
         </div>
       )}
 
@@ -139,6 +158,7 @@ export const AdminDashboard: React.FC = () => {
 
       {projectFormOpen && (
         <ProjectForm
+          key={editingProject?.id ?? 'new-project'}
           editing={editingProject}
           onClose={() => {
             setProjectFormOpen(false);
@@ -161,7 +181,7 @@ function DashboardUnlock({
 }) {
   const startX = useRef<number | null>(null);
   const [email, setEmail] = useState(import.meta.env.VITE_ADMIN_EMAIL?.trim() || '');
-  const [password, setPassword] = useState(import.meta.env.VITE_ADMIN_PASSWORD || '');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -199,19 +219,6 @@ function DashboardUnlock({
         <form className="mt-7 space-y-4" onSubmit={async event => {
           event.preventDefault();
           setError('');
-          const localAdminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase();
-          const localAdminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
-          const matchesLocalCredentials =
-            localAdminEmail &&
-            localAdminPassword &&
-            email.trim().toLowerCase() === localAdminEmail &&
-            password === localAdminPassword;
-
-          if (matchesLocalCredentials) {
-            onUnlock();
-            return;
-          }
-
           if (demoMode) {
             onUnlock();
             return;

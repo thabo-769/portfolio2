@@ -22,13 +22,17 @@ const config = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string | undefined,
 };
 
+// Keep the dashboard free by default. Set VITE_FREE_DASHBOARD_ACCESS=false
+// when the project is ready to use authenticated Firebase cloud sync.
+const freeDashboardAccess = import.meta.env.VITE_FREE_DASHBOARD_ACCESS !== 'false';
+
 /**
  * Returns true only when a usable Firebase project has been configured.
  * Authentication and Firestore only need the core Firebase app settings.
  * Storage remains optional until an image upload is requested.
  */
 export function isFirebaseConfigured(): boolean {
-  return Boolean(config.apiKey && config.authDomain && config.projectId);
+  return !freeDashboardAccess && Boolean(config.apiKey && config.authDomain && config.projectId);
 }
 
 let app: FirebaseApp | null = null;

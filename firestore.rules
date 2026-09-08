@@ -9,29 +9,74 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'thabolanez2@gmail.com'
+      );
+    }
+
     // ------------------------- PROJECTS -------------------------
     match /projects/{projectId} {
-      // Anyone (including anonymous visitors powering the public portfolio)
-      // can read. Because reads power the public landing page, keep read open
-      // but restrict writes strictly to the Firestore-verified admin.
-      allow read: if true;
+      // Anonymous visitors can only query active published projects. Admins
+      // can read drafts and trashed projects from the dashboard.
+      allow read: if isAdmin() || (
+        resource.data.isDeleted == false &&
+        resource.data.status == 'Published'
+      );
 
-      // Writes require a signed-in user.
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Public portfolio content is read-only. Dashboard writes remain admin-only.
+    match /content/{contentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /settings/{settingsId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /skills/{skillId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /referrals/{referralId} {
+      allow read: if resource.data.isDeleted == false;
+      allow write: if isAdmin();
+    }
+
+    // Public visitors may submit contact messages, but only admins can read
+    // or manage them from the dashboard.
+    match /messages/{messageId} {
+      allow create: if request.resource.data.senderName is string
+        && request.resource.data.email is string
+        && request.resource.data.message is string
+        && request.resource.data.senderName.size() <= 120
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.message.size() <= 5000;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /activity/{activityId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Public analytics events are accepted from the portfolio; only admins
+    // can read the resulting dashboard analytics.
+    match /analytics/{analyticsId} {
+      allow create: if request.resource.data.type is string;
+      allow read, update, delete: if isAdmin();
     }
 
     // Image metadata is created after a successful Storage upload.
     match /media/{mediaId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      allow create, update, delete: if isAdmin();
     }
-
-    // -------------------- FUTURE COLLECTIONS --------------------
-    // Only authenticated admins may read/write any other managed content
-    // (skills, profile info, settings, etc.) until public-read rules are
-    // intentionally added per collection.
 
     match /{document=**} {
       allow read, write: if false;

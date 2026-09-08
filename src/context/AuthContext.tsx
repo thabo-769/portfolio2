@@ -28,12 +28,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const isConfigured = isFirebaseConfigured();
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase() || '';
-  const isAuthorized = !adminEmail || user?.email?.trim().toLowerCase() === adminEmail;
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase() || 'thabolanez2@gmail.com';
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(!isConfigured);
+
+  const hasAdminAccess = async (candidate: User, forceRefresh = false): Promise<boolean> => {
+    try {
+      const token = await candidate.getIdTokenResult(forceRefresh);
+      return token.claims.admin === true || candidate.email?.trim().toLowerCase() === adminEmail;
+    } catch {
+      return candidate.email?.trim().toLowerCase() === adminEmail;
+    }
+  };
 
   useEffect(() => {
     if (!isConfigured) {
       setUser(null);
+      setIsAuthorized(true);
       setLoading(false);
       return;
     }
@@ -46,7 +56,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         unsubscribe = onAuthChange(nextUser => {
           setUser(nextUser);
           setLoading(false);
-
         });
       })
       .catch(() => {
@@ -59,9 +68,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [isConfigured]);
 
+  useEffect(() => {
+    if (!isConfigured) {
+      setIsAuthorized(true);
+      return;
+    }
+    if (!user) {
+      setIsAuthorized(false);
+      return;
+    }
+
+    let cancelled = false;
+    void hasAdminAccess(user).then(authorized => {
+      if (!cancelled) setIsAuthorized(authorized);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminEmail, isConfigured, user]);
+
   const signIn = async (email: string, password: string): Promise<User> => {
     const u = await fbSignIn(email, password);
+    const authorized = await hasAdminAccess(u, true);
+    if (!authorized) {
+      await fbSignOut().catch(() => undefined);
+      setUser(null);
+      setIsAuthorized(false);
+      const authorizationError = new Error('This Firebase account is not authorized to manage portfolio data.');
+      Object.assign(authorizationError, { code: 'auth/admin-not-authorized' });
+      throw authorizationError;
+    }
     setUser(u);
+    setIsAuthorized(true);
     return u;
   };
 

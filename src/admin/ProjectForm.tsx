@@ -28,6 +28,7 @@ interface FormState {
   category: string;
   technologies: string;
   imageUrl: string;
+  imagePath: string;
   galleryUrls: string;
   githubUrl: string;
   liveUrl: string;
@@ -46,6 +47,18 @@ function generateId(): string {
   return `project-${Date.now()}`;
 }
 
+const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function buildInitial(editing: Project | null): FormState {
   if (!editing) {
     return {
@@ -55,6 +68,7 @@ function buildInitial(editing: Project | null): FormState {
       category: 'Personal',
       technologies: '',
       imageUrl: '',
+      imagePath: '',
       galleryUrls: '',
       githubUrl: '',
       liveUrl: '',
@@ -74,6 +88,7 @@ function buildInitial(editing: Project | null): FormState {
     category: editing.category,
     technologies: editing.technologies.join(', '),
     imageUrl: editing.image,
+    imagePath: editing.imagePath ?? '',
     galleryUrls: editing.images.join(', '),
     githubUrl: editing.githubUrl,
     liveUrl: editing.liveUrl,
@@ -87,14 +102,16 @@ function buildInitial(editing: Project | null): FormState {
 }
 
 export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) => {
-  const { saveProject, uploadMedia, logActivity } = usePortfolioCms();
+  const { saveProject, uploadProjectImage, logActivity } = usePortfolioCms();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLTextAreaElement | null>>({});
   const [form, setForm] = useState<FormState>(() => buildInitial(editing));
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const projectIdRef = useRef(editing?.id ?? generateId());
 
   const update = (patch: Partial<FormState>) => {
     setForm(prev => ({ ...prev, ...patch }));
@@ -111,9 +128,9 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
     if (!form.description.trim()) next.description = 'About project is required.';
     if (!form.imageUrl.trim()) next.imageUrl = 'Choose an image or upload one.';
     if (!form.githubUrl.trim()) next.githubUrl = 'GitHub link is required.';
-    else if (!/^https?:\/\//i.test(form.githubUrl)) next.githubUrl = 'Use a valid URL.';
+    else if (!isValidHttpUrl(form.githubUrl.trim())) next.githubUrl = 'Use a valid http:// or https:// URL.';
     if (!form.liveUrl.trim()) next.liveUrl = 'Live link is required.';
-    else if (!/^https?:\/\//i.test(form.liveUrl)) next.liveUrl = 'Use a valid URL.';
+    else if (!isValidHttpUrl(form.liveUrl.trim())) next.liveUrl = 'Use a valid http:// or https:// URL.';
     setErrors(next);
     const firstInvalidField = Object.keys(next)[0];
     if (firstInvalidField) {
@@ -128,25 +145,39 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
 
   const handleUpload = async (file: File | undefined) => {
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast('Please choose an image file.', 'warning');
+    if (!ACCEPTED_IMAGE_TYPES.has(file.type)) {
+      const message = 'Please choose a JPG, PNG, or WebP image.';
+      setErrors(current => ({ ...current, imageUrl: message }));
+      toast(message, 'warning');
       return;
     }
+    if (file.size > MAX_IMAGE_SIZE) {
+      const message = 'Project images must be 10 MB or smaller.';
+      setErrors(current => ({ ...current, imageUrl: message }));
+      toast(message, 'warning');
+      return;
+    }
+    const previousImage = form.imageUrl;
+    const previousImagePath = form.imagePath;
     const previewUrl = URL.createObjectURL(file);
-    update({ imageUrl: previewUrl });
+    update({ imageUrl: previewUrl, imagePath: '' });
     toast('Image inserted. Uploading...', 'info');
     setUploading(true);
+    setUploadProgress(0);
     try {
-      const asset = await uploadMedia(file, 'project', form.name.trim() || 'Project image');
+      const asset = await uploadProjectImage(file, projectIdRef.current, progress => setUploadProgress(progress));
       URL.revokeObjectURL(previewUrl);
-      update({ imageUrl: asset.url });
+      update({ imageUrl: asset.url, imagePath: asset.path });
       toast('Image uploaded and linked to the project.', 'success');
     } catch (error) {
       URL.revokeObjectURL(previewUrl);
-      update({ imageUrl: '' });
-      toast(error instanceof Error ? error.message : 'Unable to upload image. Check Firebase Storage settings.', 'error');
+      update({ imageUrl: previousImage, imagePath: previousImagePath });
+      const message = error instanceof Error ? error.message : 'Unable to upload image. Check Firebase Storage settings.';
+      setErrors(current => ({ ...current, imageUrl: message }));
+      toast(message, 'error');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -161,7 +192,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
 
     setSaving(true);
     try {
-      const id = editing?.id ?? generateId();
+      const id = editing?.id ?? projectIdRef.current;
       const projectName = deriveProjectName();
       const project: Project = {
         id,
@@ -174,6 +205,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
           .map(item => item.trim())
           .filter(Boolean),
         image: form.imageUrl.trim(),
+        imagePath: form.imagePath.trim() || undefined,
         images: form.galleryUrls
           .split(',')
           .map(item => item.trim())
@@ -325,7 +357,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                       className="hidden"
                       onChange={e => {
                         void handleUpload(e.target.files?.[0]);
@@ -339,7 +371,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
                       className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-zinc-300 transition-all hover:bg-white/10"
                     >
                       {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-                      <span>{uploading ? 'Uploading image...' : 'Upload project image'}</span>
+                      <span>{uploading ? `Uploading image... ${uploadProgress}%` : 'Upload project image'}</span>
                       <span className="text-xs text-zinc-500">PNG, JPG, or WebP</span>
                     </button>
 
@@ -358,7 +390,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
                     </div>
                     <button
                       type="button"
-                      onClick={() => update({ imageUrl: '' })}
+                      onClick={() => update({ imageUrl: '', imagePath: '' })}
                       className="w-full rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300 transition-all hover:bg-white/10"
                     >
                       Remove image

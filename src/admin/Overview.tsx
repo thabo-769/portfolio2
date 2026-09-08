@@ -25,6 +25,7 @@ interface StatCard {
   value: string;
   icon: React.ReactNode;
   tone: string;
+  navigateTo?: AdminSection;
 }
 
 function formatDateTime(value: number | null): string {
@@ -55,12 +56,12 @@ export const Overview: React.FC<OverviewProps> = ({ onNavigate }) => {
     );
 
     return [
-      { label: 'Total Projects', value: String(activeProjects.length), icon: <FolderKanban className="h-5 w-5" />, tone: 'from-white to-zinc-300' },
-      { label: 'Published Projects', value: String(published.length), icon: <CheckCircle2 className="h-5 w-5" />, tone: 'from-zinc-100 to-white' },
-      { label: 'Draft Projects', value: String(draft.length), icon: <Sparkles className="h-5 w-5" />, tone: 'from-zinc-300 to-zinc-100' },
-      { label: 'Trash', value: String(trash.length), icon: <Trash2 className="h-5 w-5" />, tone: 'from-zinc-200 to-zinc-50' },
-      { label: 'Contact Messages', value: String(visibleMessages.length), icon: <Mail className="h-5 w-5" />, tone: 'from-white to-zinc-200' },
-      { label: 'Portfolio Views', value: String(analytics.portfolioViews), icon: <BarChart3 className="h-5 w-5" />, tone: 'from-zinc-200 to-white' },
+      { label: 'Total Projects', value: String(activeProjects.length), icon: <FolderKanban className="h-5 w-5" />, tone: 'from-white to-zinc-300', navigateTo: 'projects' },
+      { label: 'Published Projects', value: String(published.length), icon: <CheckCircle2 className="h-5 w-5" />, tone: 'from-zinc-100 to-white', navigateTo: 'projects' },
+      { label: 'Draft Projects', value: String(draft.length), icon: <Sparkles className="h-5 w-5" />, tone: 'from-zinc-300 to-zinc-100', navigateTo: 'projects' },
+      { label: 'Trash', value: String(trash.length), icon: <Trash2 className="h-5 w-5" />, tone: 'from-zinc-200 to-zinc-50', navigateTo: 'trash' },
+      { label: 'Contact Messages', value: String(visibleMessages.length), icon: <Mail className="h-5 w-5" />, tone: 'from-white to-zinc-200', navigateTo: 'messages' },
+      { label: 'Portfolio Views', value: String(analytics.portfolioViews), icon: <BarChart3 className="h-5 w-5" />, tone: 'from-zinc-200 to-white', navigateTo: 'analytics' },
       { label: 'Last Updated', value: formatDateTime(lastUpdated), icon: <CalendarClock className="h-5 w-5" />, tone: 'from-white to-zinc-100' },
     ];
   }, [projects, messages, analytics.portfolioViews, content.updatedAt, settings.updatedAt]);
@@ -82,12 +83,6 @@ export const Overview: React.FC<OverviewProps> = ({ onNavigate }) => {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => onNavigate('projects')}
-            className="rounded-full border border-white/10 bg-white px-4 py-2 text-sm font-semibold text-black transition-all hover:bg-zinc-100"
-          >
-            Review projects
-          </button>
           <button
             onClick={() => onNavigate('content')}
             className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/10"
@@ -111,12 +106,9 @@ export const Overview: React.FC<OverviewProps> = ({ onNavigate }) => {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.03, duration: 0.25 }}
-              onClick={() => {
-                if (stat.label.includes('Project')) onNavigate('projects');
-                else if (stat.label.includes('Messages')) onNavigate('messages');
-                else if (stat.label.includes('Views')) onNavigate('analytics');
-              }}
-              className="group rounded-3xl border border-white/10 bg-gradient-to-br from-white/8 to-white/3 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10"
+              disabled={!stat.navigateTo}
+              onClick={stat.navigateTo ? () => onNavigate(stat.navigateTo) : undefined}
+              className="group rounded-3xl border border-white/10 bg-gradient-to-br from-white/8 to-white/3 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 disabled:cursor-default disabled:opacity-100"
             >
               <div className={`mb-4 inline-flex rounded-2xl border border-white/10 bg-gradient-to-br ${stat.tone} p-3 text-black shadow-lg`}>
                 {stat.icon}
@@ -217,24 +209,24 @@ export const Overview: React.FC<OverviewProps> = ({ onNavigate }) => {
                 <span>Manage projects</span>
                 <FolderKanban className="h-4 w-4 text-zinc-400" />
               </button>
-            <button
-              onClick={() => onNavigate('messages')}
-              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
-            >
-              <span>Review inbox</span>
-              <Mail className="h-4 w-4 text-zinc-400" />
-            </button>
-            <button
-              onClick={() => onNavigate('remoteDevices')}
-              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
-            >
-              <span>Remote access</span>
-              <TabletSmartphone className="h-4 w-4 text-zinc-400" />
-            </button>
-            <button
-              onClick={() => onNavigate('analytics')}
-              className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
-            >
+              <button
+                onClick={() => onNavigate('messages')}
+                className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
+              >
+                <span>Review inbox</span>
+                <Mail className="h-4 w-4 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => onNavigate('remoteDevices')}
+                className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
+              >
+                <span>Remote access</span>
+                <TabletSmartphone className="h-4 w-4 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => onNavigate('analytics')}
+                className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white transition-all hover:bg-black/30"
+              >
                 <span>Inspect analytics</span>
                 <BarChart3 className="h-4 w-4 text-zinc-400" />
               </button>

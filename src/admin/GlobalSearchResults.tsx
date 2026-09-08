@@ -1,5 +1,5 @@
 import React, { useMemo, useSyncExternalStore } from 'react';
-import { FolderKanban, Mail, TabletSmartphone } from 'lucide-react';
+import { Mail, TabletSmartphone } from 'lucide-react';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
 import { AdminSection } from './DashboardLayout';
 import { getRemoteDevicesState, subscribeRemoteDevicesState } from '../communication/remoteDevices/services/remoteDevicesStore';
@@ -10,20 +10,13 @@ interface GlobalSearchResultsProps {
 }
 
 export const GlobalSearchResults: React.FC<GlobalSearchResultsProps> = ({ query, onNavigate }) => {
-  const { projects, messages } = usePortfolioCms();
+  const { messages } = usePortfolioCms();
   const remoteDevices = useSyncExternalStore(subscribeRemoteDevicesState, getRemoteDevicesState, getRemoteDevicesState).devices;
 
   const term = query.trim().toLowerCase();
 
   const results = useMemo(() => {
     if (!term) return null;
-
-    const projectMatches = projects.filter(project =>
-      [project.name, project.shortDescription, project.description, project.category, ...(project.technologies ?? [])]
-        .join(' ')
-        .toLowerCase()
-        .includes(term)
-    );
 
     const messageMatches = messages.filter(message =>
       [message.senderName, message.email, message.subject, message.message].join(' ').toLowerCase().includes(term)
@@ -36,18 +29,12 @@ export const GlobalSearchResults: React.FC<GlobalSearchResultsProps> = ({ query,
         .includes(term)
     );
 
-    return { projectMatches, messageMatches, deviceMatches };
-  }, [term, projects, messages, remoteDevices]);
+    return { messageMatches, deviceMatches };
+  }, [term, messages, remoteDevices]);
 
   if (!results) return null;
 
   const sections = [
-    {
-      id: 'projects' as AdminSection,
-      label: 'Projects',
-      icon: <FolderKanban className="h-4 w-4" />,
-      items: results.projectMatches.map(item => item.name),
-    },
     {
       id: 'messages' as AdminSection,
       label: 'Messages',
@@ -74,7 +61,7 @@ export const GlobalSearchResults: React.FC<GlobalSearchResultsProps> = ({ query,
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-2">
         {sections.map(section => (
           <button
             key={section.id}

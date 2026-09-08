@@ -3,11 +3,14 @@ import { motion } from 'framer-motion';
 import {
   ArrowUpDown,
   Eye,
+  ExternalLink,
   FolderKanban,
+  Github,
   GripVertical,
   Loader2,
   PackageOpen,
   Pencil,
+  Plus,
   Search,
   Star,
   ToggleLeft,
@@ -22,11 +25,21 @@ import { ProjectDetailModal } from '../components/UI/ProjectDetailModal';
 
 type FilterKey = 'all' | 'personal' | 'business' | 'mobile' | 'gift' | 'published' | 'draft' | 'featured';
 
+function formatAddedDate(value: number): string {
+  if (!value) return 'Unknown';
+  return new Date(value).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 interface ProjectsManagerProps {
+  onAdd: () => void;
   onEdit: (project: Project) => void;
 }
 
-export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
+export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onAdd, onEdit }) => {
   const { projects, loading, trashProject, toggleProjectFeatured, toggleProjectStatus, reorderProjects, logActivity } =
     usePortfolioCms();
   const { toast } = useToast();
@@ -35,6 +48,7 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [selected, setSelected] = useState<Project | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const activeProjects = useMemo(
     () => projects.filter(project => !project.isDeleted).sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
@@ -104,51 +118,79 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
 
     const [moved] = reordered.splice(dragged, 1);
     reordered.splice(target, 0, moved);
-    await reorderProjects(reordered.map(project => project.id));
-    await logActivity({
-      action: 'Project reordered',
-      item: moved.name,
-      itemType: 'project',
-      user: 'Administrator',
-      details: `Moved from position ${dragged + 1} to ${target + 1}`,
-    });
-    toast('Project order updated.', 'success');
-    setDragId(null);
+    setBusyId(moved.id);
+    try {
+      await reorderProjects(reordered.map(project => project.id));
+      await logActivity({
+        action: 'Project reordered',
+        item: moved.name,
+        itemType: 'project',
+        user: 'Administrator',
+        details: `Moved from position ${dragged + 1} to ${target + 1}`,
+      });
+      toast('Project order updated.', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to update project order.', 'error');
+    } finally {
+      setBusyId(null);
+      setDragId(null);
+    }
   };
 
   const handleToggleFeatured = async (project: Project) => {
-    await toggleProjectFeatured(project.id, !project.featured);
-    await logActivity({
-      action: project.featured ? 'Project unfeatured' : 'Project featured',
-      item: project.name,
-      itemType: 'project',
-      user: 'Administrator',
-    });
-    toast(project.featured ? 'Project unfeatured.' : 'Project featured.', 'info');
+    setBusyId(project.id);
+    try {
+      await toggleProjectFeatured(project.id, !project.featured);
+      await logActivity({
+        action: project.featured ? 'Project unfeatured' : 'Project featured',
+        item: project.name,
+        itemType: 'project',
+        user: 'Administrator',
+      });
+      toast(project.featured ? 'Project unfeatured.' : 'Project featured.', 'info');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to update featured state.', 'error');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleToggleStatus = async (project: Project) => {
     const nextStatus = project.status === 'Published' ? 'Draft' : 'Published';
-    await toggleProjectStatus(project.id, nextStatus);
-    await logActivity({
-      action: nextStatus === 'Published' ? 'Project published' : 'Project unpublished',
-      item: project.name,
-      itemType: 'project',
-      user: 'Administrator',
-    });
-    toast(nextStatus === 'Published' ? 'Project published.' : 'Project saved as draft.', 'success');
+    setBusyId(project.id);
+    try {
+      await toggleProjectStatus(project.id, nextStatus);
+      await logActivity({
+        action: nextStatus === 'Published' ? 'Project published' : 'Project unpublished',
+        item: project.name,
+        itemType: 'project',
+        user: 'Administrator',
+      });
+      toast(nextStatus === 'Published' ? 'Project published.' : 'Project saved as draft.', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to update project status.', 'error');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleTrash = async (project: Project) => {
-    await trashProject(project.id);
-    await logActivity({
-      action: 'Project moved to trash',
-      item: project.name,
-      itemType: 'project',
-      user: 'Administrator',
-    });
-    toast('Project moved to trash.', 'success');
-    if (selected?.id === project.id) setSelected(null);
+    setBusyId(project.id);
+    try {
+      await trashProject(project.id);
+      await logActivity({
+        action: 'Project moved to trash',
+        item: project.name,
+        itemType: 'project',
+        user: 'Administrator',
+      });
+      toast('Project moved to trash.', 'success');
+      if (selected?.id === project.id) setSelected(null);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to move project to trash.', 'error');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const selectedIndex = selected ? filteredProjects.findIndex(project => project.id === selected.id) : -1;
@@ -174,6 +216,15 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
             Add, edit, publish, feature, reorder, and trash projects. The order here is the order that the public portfolio uses.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition-all hover:bg-zinc-100"
+        >
+          <Plus className="h-4 w-4" />
+          Add project
+        </button>
 
       </div>
 
@@ -238,6 +289,8 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
                   <th className="px-4 py-4">Order</th>
                   <th className="px-4 py-4">Project</th>
                   <th className="px-4 py-4">Status</th>
+                  <th className="px-4 py-4">Links</th>
+                  <th className="px-4 py-4">Added</th>
                   <th className="px-4 py-4">Featured</th>
                   <th className="px-4 py-4">Tech</th>
                   <th className="px-4 py-4 text-right">Actions</th>
@@ -309,6 +362,7 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
                     <td className="px-4 py-4 align-top">
                       <button
                         onClick={() => void handleToggleStatus(project)}
+                        disabled={busyId === project.id}
                         className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition-all ${
                           project.status === 'Published'
                             ? 'border-white/10 bg-white text-black'
@@ -319,8 +373,38 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
                       </button>
                     </td>
                     <td className="px-4 py-4 align-top">
+                      <div className="flex flex-wrap gap-2">
+                        {project.liveUrl && (
+                          <a
+                            href={project.liveUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/20 px-2.5 py-1.5 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            Live
+                          </a>
+                        )}
+                        {project.githubUrl && (
+                          <a
+                            href={project.githubUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/20 px-2.5 py-1.5 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white"
+                          >
+                            <Github className="h-3.5 w-3.5" />
+                            GitHub
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 align-top text-sm text-zinc-400">
+                      {formatAddedDate(project.createdAt)}
+                    </td>
+                    <td className="px-4 py-4 align-top">
                       <button
                         onClick={() => void handleToggleFeatured(project)}
+                        disabled={busyId === project.id}
                         className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-300 transition-all hover:bg-white/5 hover:text-white"
                       >
                         <Star className={`h-3.5 w-3.5 ${project.featured ? 'fill-white text-white' : ''}`} />
@@ -362,6 +446,7 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onEdit }) => {
                         </button>
                         <button
                           onClick={() => void handleTrash(project)}
+                          disabled={busyId === project.id}
                           className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300 transition-all hover:bg-white hover:text-black"
                           aria-label="Move project to trash"
                         >

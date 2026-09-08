@@ -294,7 +294,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
               <div className="flex items-center gap-3">
                 <a
-                  href={project.githubUrl || `https://github.com/thabolanez4/${project.id}`}
+                  href={project.githubUrl || `https://github.com/thabo-769/${project.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2.5 rounded-xl bg-[#0C0C0C] hover:bg-[#18181B] text-white text-xs font-semibold uppercase tracking-wider transition-colors flex items-center gap-2 border border-[#1F1F1F] hover:border-white"
@@ -304,7 +304,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 </a>
 
                 <a
-                  href={project.liveUrl || 'https://github.com/thabolanez4'}
+                  href={project.liveUrl || 'https://thabo.dev'}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-6 py-2.5 rounded-xl bg-white hover:bg-[#A1A1AA] text-[#000000] text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-md hover:scale-105"

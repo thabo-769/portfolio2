@@ -7,10 +7,13 @@ import {
   setDoc,
   updateDoc,
   addDoc,
+  query,
+  where,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
-import { getFirestoreDB, getFirebaseStorage, isFirebaseConfigured } from './config';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
+import { getFirebaseAuth, getFirestoreDB, getFirebaseStorage, isFirebaseConfigured } from './config';
 import {
   defaultPortfolioContent,
   defaultPortfolioSettings,
@@ -51,6 +54,8 @@ const DOC_IDS = {
   content: 'main',
   settings: 'main',
 } as const;
+
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase() || 'thabolanez2@gmail.com';
 
 const DEFAULT_ANALYTICS: AnalyticsSummary = {
   portfolioViews: 0,
@@ -152,6 +157,33 @@ function subscribeLocalDoc<T>(key: string, fallback: T, onUpdate: DocumentListen
   };
 }
 
+function readProjectsLocal(): Project[] {
+  return sortByDisplayOrder(
+    readList<Record<string, unknown>>(KEYS.projects, []).map((item, index) =>
+      normalizeProject(item, String(item.id ?? `project-${index}`))
+    )
+  );
+}
+
+function writeProjectsLocal(items: Project[]): void {
+  writeList(KEYS.projects, items);
+}
+
+function subscribeLocalProjects(onUpdate: CollectionListener<Project>): Unsubscribe {
+  const emit = () => onUpdate(readProjectsLocal(), null);
+  emit();
+
+  if (typeof window === 'undefined') return () => undefined;
+
+  const handle = () => emit();
+  window.addEventListener(eventName(KEYS.projects), handle);
+  window.addEventListener('storage', handle);
+  return () => {
+    window.removeEventListener(eventName(KEYS.projects), handle);
+    window.removeEventListener('storage', handle);
+  };
+}
+
 function sortByDisplayOrder<T extends { displayOrder?: number; createdAt?: number; updatedAt?: number; name?: string }>(
   list: T[]
 ): T[] {
@@ -196,6 +228,17 @@ function normalizeBoolean(value: unknown, fallback = false): boolean {
   return fallback;
 }
 
+async function isAdminUser(user: User | null): Promise<boolean> {
+  if (!user) return false;
+  if (user.email?.trim().toLowerCase() === ADMIN_EMAIL) return true;
+  try {
+    const token = await user.getIdTokenResult();
+    return token.claims.admin === true;
+  } catch {
+    return false;
+  }
+}
+
 function normalizeProject(raw: Record<string, unknown>, id: string): Project {
   const name = String(raw.name ?? raw.title ?? 'Untitled Project');
   const description = String(raw.description ?? raw.longDescription ?? '');
@@ -208,6 +251,7 @@ function normalizeProject(raw: Record<string, unknown>, id: string): Project {
     category: String(raw.category ?? 'Other'),
     technologies: asStringArray(raw.technologies),
     image: String(raw.image ?? ''),
+    imagePath: raw.imagePath ? String(raw.imagePath) : undefined,
     images: asStringArray(raw.images),
     githubUrl: String(raw.githubUrl ?? ''),
     liveUrl: String(raw.liveUrl ?? ''),
@@ -419,18 +463,6 @@ function normalizeSettings(
   };
 }
 
-function readProjectsLocal(): Project[] {
-  return sortByDisplayOrder(
-    readList<Record<string, unknown>>(KEYS.projects, []).map((item, index) =>
-      normalizeProject(item, String(item.id ?? `project-${index}`))
-    )
-  );
-}
-
-function writeProjectsLocal(items: Project[]): void {
-  writeList(KEYS.projects, items);
-}
-
 function readSkillsLocal(): Skill[] {
   const stored = readList<Record<string, unknown>>(KEYS.skills, []);
   const base = stored.length > 0 ? stored : defaultSkills;
@@ -554,13 +586,67 @@ function subscribeFirestoreDoc<T>(
 
 export function subscribeToProjects(onUpdate: CollectionListener<Project>): Unsubscribe {
   if (!isFirebaseConfigured()) {
-    return subscribeLocalList(KEYS.projects, [], onUpdate);
+    return subscribeLocalProjects(onUpdate);
   }
-  return subscribeFirestoreList('projects', (id, raw) => normalizeProject(raw, id), (items, error) => {
-    const local = readProjectsLocal();
-    const merged = mergeProjectSources(items, local);
-    onUpdate(merged, merged.length > 0 ? null : error);
+
+  let firestoreUnsubscribe: Unsubscribe = () => undefined;
+  let subscriptionVersion = 0;
+  const authUnsubscribe = onAuthStateChanged(getFirebaseAuth(), user => {
+    const currentVersion = ++subscriptionVersion;
+    firestoreUnsubscribe();
+    void isAdminUser(user).then(isAdmin => {
+      if (currentVersion !== subscriptionVersion) return;
+      const projectsQuery = isAdmin
+      ? collection(getFirestoreDB(), 'projects')
+      : query(
+          collection(getFirestoreDB(), 'projects'),
+          where('isDeleted', '==', false),
+          where('status', '==', 'Published')
+        );
+      firestoreUnsubscribe = onSnapshot(
+        projectsQuery,
+        snapshot => onUpdate(snapshot.docs.map(docSnap => normalizeProject(docSnap.data() as Record<string, unknown>, docSnap.id)), null),
+        error => onUpdate([], error instanceof Error ? error.message : 'Unable to load projects.')
+      );
+    });
   });
+
+  return () => {
+    subscriptionVersion += 1;
+    authUnsubscribe();
+    firestoreUnsubscribe();
+  };
+}
+
+function subscribeToAdminCollection<T>(
+  collectionName: string,
+  mapper: (id: string, raw: Record<string, unknown>) => T,
+  onUpdate: CollectionListener<T>
+): Unsubscribe {
+  let firestoreUnsubscribe: Unsubscribe = () => undefined;
+  let subscriptionVersion = 0;
+  const authUnsubscribe = onAuthStateChanged(getFirebaseAuth(), user => {
+    const currentVersion = ++subscriptionVersion;
+    firestoreUnsubscribe();
+    if (!user) {
+      onUpdate([], null);
+      return;
+    }
+    void isAdminUser(user).then(isAdmin => {
+      if (currentVersion !== subscriptionVersion) return;
+      if (!isAdmin) {
+        onUpdate([], null);
+        return;
+      }
+      firestoreUnsubscribe = subscribeFirestoreList(collectionName, mapper, onUpdate);
+    });
+  });
+
+  return () => {
+    subscriptionVersion += 1;
+    authUnsubscribe();
+    firestoreUnsubscribe();
+  };
 }
 
 export function subscribeToSkills(onUpdate: CollectionListener<Skill>): Unsubscribe {
@@ -585,7 +671,7 @@ export function subscribeToMessages(onUpdate: CollectionListener<ContactMessage>
   if (!isFirebaseConfigured()) {
     return subscribeLocalList(KEYS.messages, [], onUpdate);
   }
-  return subscribeFirestoreList('messages', (id, raw) => normalizeMessage(raw, id), (items, error) => {
+  return subscribeToAdminCollection('messages', (id, raw) => normalizeMessage(raw, id), (items, error) => {
     onUpdate(sortByNewest(items), error);
   });
 }
@@ -603,7 +689,7 @@ export function subscribeToActivity(onUpdate: CollectionListener<ActivityLogEntr
   if (!isFirebaseConfigured()) {
     return subscribeLocalList(KEYS.activity, [], onUpdate);
   }
-  return subscribeFirestoreList('activity', (id, raw) => normalizeActivity(raw, id), (items, error) => {
+  return subscribeToAdminCollection('activity', (id, raw) => normalizeActivity(raw, id), (items, error) => {
     onUpdate(sortByNewest(items), error);
   });
 }
@@ -612,7 +698,7 @@ export function subscribeToAnalyticsEvents(onUpdate: CollectionListener<Analytic
   if (!isFirebaseConfigured()) {
     return subscribeLocalList(KEYS.analytics, [], onUpdate);
   }
-  return subscribeFirestoreList('analytics', (id, raw) => normalizeAnalyticsEvent(raw, id), (items, error) => {
+  return subscribeToAdminCollection('analytics', (id, raw) => normalizeAnalyticsEvent(raw, id), (items, error) => {
     onUpdate(sortByNewest(items), error);
   });
 }
@@ -641,13 +727,6 @@ function saveListItem<T extends { id: string }>(key: string, items: T[], item: T
 
 function removeListItem<T extends { id: string }>(items: T[], id: string): T[] {
   return items.filter(item => item.id !== id);
-}
-
-function mergeProjectSources(remote: Project[], local: Project[]): Project[] {
-  const merged = new Map<string, Project>();
-  local.forEach(project => merged.set(project.id, project));
-  remote.forEach(project => merged.set(project.id, project));
-  return sortByDisplayOrder([...merged.values()]);
 }
 
 function updateFirestoreListDoc(collectionName: string, itemId: string, payload: Record<string, unknown>): Promise<void> {
@@ -743,26 +822,20 @@ export async function recordAnalyticsEvent(event: Omit<AnalyticsEvent, 'id' | 'c
   await addDoc(collection(getFirestoreDB(), 'analytics'), payload);
 }
 
-export async function upsertProject(project: Project, imageUrl?: string): Promise<string> {
+export async function upsertProject(project: Project, imageUrl?: string, imagePath?: string): Promise<string> {
   const payload = {
     ...project,
     image: imageUrl ?? project.image,
+    imagePath: imagePath ?? project.imagePath ?? null,
     updatedAt: now(),
   };
   if (!isFirebaseConfigured()) {
     const existing = readProjectsLocal();
-    const next = saveListItem(KEYS.projects, existing, { ...project, image: payload.image, updatedAt: payload.updatedAt });
+    const next = saveListItem(KEYS.projects, existing, normalizeProject(payload as Record<string, unknown>, project.id));
     writeProjectsLocal(sortByDisplayOrder(next));
     return project.id;
   }
-  try {
-    await updateFirestoreListDoc('projects', project.id, payload);
-  } catch {
-    // Keep the editor usable when Firebase Auth/rules are not enabled yet.
-    const existing = readProjectsLocal();
-    const next = saveListItem(KEYS.projects, existing, { ...project, image: payload.image, updatedAt: payload.updatedAt });
-    writeProjectsLocal(sortByDisplayOrder(next));
-  }
+  await updateFirestoreListDoc('projects', project.id, payload);
   return project.id;
 }
 
@@ -781,78 +854,147 @@ export async function createProjectEntry(project: Project, imageUrl?: string): P
     writeProjectsLocal(sortByDisplayOrder(next));
     return id;
   }
-  try {
-    await setDoc(doc(getFirestoreDB(), 'projects', id), payload, { merge: true });
-  } catch {
-    const existing = readProjectsLocal();
-    const next = saveListItem(KEYS.projects, existing, normalizeProject(payload as Record<string, unknown>, id));
-    writeProjectsLocal(sortByDisplayOrder(next));
-  }
+  await setDoc(doc(getFirestoreDB(), 'projects', id), payload, { merge: true });
   return id;
 }
 
 export async function trashProjectEntry(id: string): Promise<void> {
   if (!isFirebaseConfigured()) {
-    const existing = readProjectsLocal();
-    const next = existing.map(project =>
-      project.id === id
-        ? { ...project, isDeleted: true, deletedAt: now(), updatedAt: now() }
-        : project
-    );
-    writeProjectsLocal(sortByDisplayOrder(next));
+    const updatedAt = now();
+    writeProjectsLocal(readProjectsLocal().map(project =>
+      project.id === id ? { ...project, isDeleted: true, deletedAt: updatedAt, updatedAt } : project
+    ));
     return;
   }
   const deletedAt = now();
-  try {
-    await updateFirestoreListExisting('projects', id, {
-      isDeleted: true,
-      deletedAt,
-      updatedAt: deletedAt,
-    });
-  } catch {
-    const next = readProjectsLocal().map(project =>
-      project.id === id ? { ...project, isDeleted: true, deletedAt, updatedAt: deletedAt } : project
-    );
-    writeProjectsLocal(sortByDisplayOrder(next));
-  }
+  await updateFirestoreListExisting('projects', id, {
+    isDeleted: true,
+    deletedAt,
+    updatedAt: deletedAt,
+  });
 }
 
 export async function restoreProjectEntry(id: string): Promise<void> {
   if (!isFirebaseConfigured()) {
-    const existing = readProjectsLocal();
-    const next = existing.map(project =>
-      project.id === id
-        ? { ...project, isDeleted: false, deletedAt: null, updatedAt: now() }
-        : project
-    );
-    writeProjectsLocal(sortByDisplayOrder(next));
+    writeProjectsLocal(readProjectsLocal().map(project =>
+      project.id === id ? { ...project, isDeleted: false, deletedAt: null, updatedAt: now() } : project
+    ));
     return;
   }
   const updatedAt = now();
-  try {
-    await updateFirestoreListExisting('projects', id, {
-      isDeleted: false,
-      deletedAt: null,
-      updatedAt,
-    });
-  } catch {
-    const next = readProjectsLocal().map(project =>
-      project.id === id ? { ...project, isDeleted: false, deletedAt: null, updatedAt } : project
-    );
-    writeProjectsLocal(sortByDisplayOrder(next));
-  }
+  await updateFirestoreListExisting('projects', id, {
+    isDeleted: false,
+    deletedAt: null,
+    updatedAt,
+  });
 }
 
 export async function permanentlyDeleteProjectEntry(project: Project): Promise<void> {
   if (!isFirebaseConfigured()) {
-    const existing = readProjectsLocal();
-    writeProjectsLocal(removeListItem(existing, project.id));
+    writeProjectsLocal(removeListItem(readProjectsLocal(), project.id));
     return;
   }
+  if (project.image) {
+    try {
+      await deleteObject(ref(getFirebaseStorage(), project.imagePath || project.image));
+    } catch (error) {
+      console.warn('Project document will be deleted, but its image could not be removed:', error);
+    }
+  }
+  await deleteFirestoreListDoc('projects', project.id);
+}
+
+const PROJECT_IMAGE_UPLOAD_TIMEOUT_MS = 5000;
+const PROJECT_IMAGE_MAX_DIMENSION = 1600;
+const PROJECT_IMAGE_COMPRESSION_THRESHOLD = 2 * 1024 * 1024;
+
+export interface ProjectImageUploadResult {
+  url: string;
+  path: string;
+}
+
+export async function uploadProjectImageEntry(
+  file: File,
+  projectId: string,
+  onProgress?: (progress: number) => void
+): Promise<ProjectImageUploadResult> {
+  if (!isFirebaseConfigured()) {
+    const url = await fileToOptimizedDataUrl(file).catch(() => fileToDataUrl(file));
+    onProgress?.(100);
+    return { url, path: '' };
+  }
+
+  const preparedFile = await optimizeProjectImage(file);
+  const path = `projects/${projectId}/${Date.now()}_${sanitizeFileName(preparedFile.name)}`;
+  const task = uploadBytesResumable(ref(getFirebaseStorage(), path), preparedFile, {
+    contentType: preparedFile.type,
+    cacheControl: 'public,max-age=31536000,immutable',
+  });
+
+  return new Promise<ProjectImageUploadResult>((resolve, reject) => {
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      task.cancel();
+      reject(new Error('Image upload exceeded 5 seconds. Choose a smaller image or try again.'));
+    }, PROJECT_IMAGE_UPLOAD_TIMEOUT_MS);
+
+    task.on(
+      'state_changed',
+      snapshot => {
+        onProgress?.(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
+      },
+      error => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        reject(new Error(error.message || 'Unable to upload the project image to Firebase Storage.'));
+      },
+      async () => {
+        if (settled) return;
+        try {
+          const url = await getDownloadURL(task.snapshot.ref);
+          settled = true;
+          window.clearTimeout(timeout);
+          onProgress?.(100);
+          resolve({ url, path });
+        } catch (error) {
+          settled = true;
+          window.clearTimeout(timeout);
+          reject(error instanceof Error ? error : new Error('Unable to resolve the uploaded project image URL.'));
+        }
+      }
+    );
+  });
+}
+
+async function optimizeProjectImage(file: File): Promise<File> {
+  if (file.size <= PROJECT_IMAGE_COMPRESSION_THRESHOLD) return file;
+
   try {
-    await deleteFirestoreListDoc('projects', project.id);
+    const dataUrl = await fileToDataUrl(file);
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error('Unable to prepare the selected image.'));
+      element.src = dataUrl;
+    });
+
+    const scale = Math.min(1, PROJECT_IMAGE_MAX_DIMENSION / Math.max(image.width, image.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', 0.82));
+    if (!blob) return file;
+    const baseName = sanitizeFileName(file.name).replace(/\.[^.]+$/, '') || 'project-image';
+    return new File([blob], `${baseName}.webp`, { type: 'image/webp', lastModified: Date.now() });
   } catch {
-    writeProjectsLocal(removeListItem(readProjectsLocal(), project.id));
+    return file;
   }
 }
 
@@ -862,11 +1004,12 @@ export async function reorderProjects(projectIds: string[]): Promise<void> {
     displayOrder: index,
   }));
   if (!isFirebaseConfigured()) {
-    const existing = readProjectsLocal().map(project => {
-      const match = updates.find(update => update.id === project.id);
-      return match ? { ...project, displayOrder: match.displayOrder, updatedAt: now() } : project;
-    });
-    writeProjectsLocal(sortByDisplayOrder(existing));
+    const orderMap = new Map(updates.map(update => [update.id, update.displayOrder]));
+    writeProjectsLocal(readProjectsLocal().map(project => ({
+      ...project,
+      displayOrder: orderMap.get(project.id) ?? project.displayOrder,
+      updatedAt: now(),
+    })));
     return;
   }
   const db = getFirestoreDB();
@@ -882,10 +1025,9 @@ export async function reorderProjects(projectIds: string[]): Promise<void> {
 
 export async function toggleProjectFeatured(id: string, featured: boolean): Promise<void> {
   if (!isFirebaseConfigured()) {
-    const existing = readProjectsLocal().map(project =>
+    writeProjectsLocal(readProjectsLocal().map(project =>
       project.id === id ? { ...project, featured, updatedAt: now() } : project
-    );
-    writeProjectsLocal(sortByDisplayOrder(existing));
+    ));
     return;
   }
   await updateFirestoreListExisting('projects', id, {
@@ -896,10 +1038,9 @@ export async function toggleProjectFeatured(id: string, featured: boolean): Prom
 
 export async function toggleProjectStatus(id: string, status: Project['status']): Promise<void> {
   if (!isFirebaseConfigured()) {
-    const existing = readProjectsLocal().map(project =>
+    writeProjectsLocal(readProjectsLocal().map(project =>
       project.id === id ? { ...project, status, updatedAt: now() } : project
-    );
-    writeProjectsLocal(sortByDisplayOrder(existing));
+    ));
     return;
   }
   await updateFirestoreListExisting('projects', id, {
@@ -1136,24 +1277,10 @@ export async function uploadMediaEntry(file: File, category: MediaAsset['categor
     const path = `media/${mediaId}/${sanitizeFileName(file.name)}`;
     const storageRef = ref(storage, path);
     const task = uploadBytesResumable(storageRef, file);
-    url = await withTimeout(
-      new Promise<string>((resolve, reject) => {
-        task.on(
-          'state_changed',
-          undefined,
-          reject,
-          () => {
-            void getDownloadURL(task.snapshot.ref).then(resolve).catch(reject);
-          }
-        );
-      }),
-      20000,
-      () => task.cancel()
-    );
-  } catch {
-    // Preserve the fast image-insertion behavior until Firebase Storage rules
-    // and Authentication are enabled in the project.
-    url = await fileToOptimizedDataUrl(file).catch(() => fileToDataUrl(file));
+    const snapshot = await task;
+    url = await getDownloadURL(snapshot.ref);
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Unable to upload the project image to Firebase Storage.');
   }
 
   const asset: MediaAsset = {
@@ -1170,12 +1297,7 @@ export async function uploadMediaEntry(file: File, category: MediaAsset['categor
     isDeleted: false,
   };
 
-  try {
-    await setDoc(doc(getFirestoreDB(), 'media', mediaId), asset);
-  } catch {
-    const existing = readMediaLocal();
-    writeMediaLocal(sortByNewest([asset, ...existing]));
-  }
+  await setDoc(doc(getFirestoreDB(), 'media', mediaId), asset);
   return asset;
 }
 
@@ -1265,26 +1387,6 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onload = () => resolve(String(reader.result ?? ''));
     reader.onerror = () => reject(new Error('Unable to read file.'));
     reader.readAsDataURL(file);
-  });
-}
-
-function withTimeout<T>(promise: Promise<T>, milliseconds: number, onTimeout: () => void): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(() => {
-      onTimeout();
-      reject(new Error('Image upload timed out. Check Firebase Storage configuration and try again.'));
-    }, milliseconds);
-
-    promise.then(
-      value => {
-        window.clearTimeout(timer);
-        resolve(value);
-      },
-      error => {
-        window.clearTimeout(timer);
-        reject(error);
-      }
-    );
   });
 }
 

@@ -167,10 +167,10 @@ export const Hero: React.FC<HeroProps> = ({ onOpenResume }) => {
 
           <div className="flex flex-wrap items-center gap-3 pt-3">
             <button
-              onClick={() => scrollTo('projects')}
+              onClick={() => scrollTo('contact')}
               className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_24px_rgba(255,255,255,0.2)] transition-all duration-300 hover:scale-105 hover:bg-zinc-100 active:scale-95"
             >
-              <span>{content.home.ctaText || 'Explore Projects'}</span>
+              <span>Let's Connect</span>
               <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </button>
 

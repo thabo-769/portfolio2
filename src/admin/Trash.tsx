@@ -14,6 +14,8 @@ export const Trash: React.FC = () => {
   const { projects, loading, restoreProject, permanentlyDeleteProject, logActivity } = usePortfolioCms();
   const { toast } = useToast();
   const [confirm, setConfirm] = useState<ConfirmState>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [emptying, setEmptying] = useState(false);
 
   const trashed = useMemo(
     () => projects.filter(project => project.isDeleted).sort((a, b) => (b.deletedAt ?? b.updatedAt) - (a.deletedAt ?? a.updatedAt)),
@@ -21,38 +23,59 @@ export const Trash: React.FC = () => {
   );
 
   const handleRestore = async (project: Project) => {
-    await restoreProject(project.id);
-    await logActivity({
-      action: 'Project restored',
-      item: project.name,
-      itemType: 'project',
-      user: 'Administrator',
-    });
-    toast('Project restored.', 'success');
+    setBusyId(project.id);
+    try {
+      await restoreProject(project.id);
+      await logActivity({
+        action: 'Project restored',
+        item: project.name,
+        itemType: 'project',
+        user: 'Administrator',
+      });
+      toast('Project restored.', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to restore project.', 'error');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleDeleteForever = async (project: Project) => {
-    await permanentlyDeleteProject(project);
-    await logActivity({
-      action: 'Project permanently deleted',
-      item: project.name,
-      itemType: 'project',
-      user: 'Administrator',
-    });
-    toast('Project permanently deleted.', 'success');
+    setBusyId(project.id);
+    try {
+      await permanentlyDeleteProject(project);
+      await logActivity({
+        action: 'Project permanently deleted',
+        item: project.name,
+        itemType: 'project',
+        user: 'Administrator',
+      });
+      toast('Project permanently deleted.', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to permanently delete project.', 'error');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleEmptyTrash = async () => {
-    for (const project of trashed) {
-      await permanentlyDeleteProject(project);
+    setEmptying(true);
+    try {
+      for (const project of trashed) {
+        await permanentlyDeleteProject(project);
+      }
+      await logActivity({
+        action: 'Trash emptied',
+        item: `${trashed.length} project${trashed.length === 1 ? '' : 's'}`,
+        itemType: 'project',
+        user: 'Administrator',
+      });
+      toast('Trash emptied.', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to empty trash.', 'error');
+    } finally {
+      setEmptying(false);
     }
-    await logActivity({
-      action: 'Trash emptied',
-      item: `${trashed.length} project${trashed.length === 1 ? '' : 's'}`,
-      itemType: 'project',
-      user: 'Administrator',
-    });
-    toast('Trash emptied.', 'success');
   };
 
   if (loading) {
@@ -126,6 +149,7 @@ export const Trash: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => void handleRestore(project)}
+                  disabled={busyId === project.id || emptying}
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-4 py-2.5 text-sm font-semibold text-black transition-all hover:bg-zinc-100"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -133,6 +157,7 @@ export const Trash: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setConfirm({ mode: 'single', project })}
+                  disabled={busyId === project.id || emptying}
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-white/10"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -166,6 +191,7 @@ export const Trash: React.FC = () => {
               </div>
               <button
                 onClick={() => setConfirm(null)}
+                disabled={emptying}
                 className="rounded-full border border-white/10 bg-white/5 p-2 text-zinc-300 hover:bg-white hover:text-black"
               >
                 <X className="h-4 w-4" />
@@ -181,6 +207,7 @@ export const Trash: React.FC = () => {
             <div className="mt-6 flex items-center justify-end gap-3">
               <button
                 onClick={() => setConfirm(null)}
+                disabled={emptying}
                 className="rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white"
               >
                 Cancel
@@ -195,9 +222,10 @@ export const Trash: React.FC = () => {
                     void handleDeleteForever(current.project);
                   }
                 }}
+                disabled={emptying || (confirm.mode === 'single' && busyId === confirm.project.id)}
                 className="rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-zinc-100"
               >
-                Confirm
+                {emptying ? 'Deleting...' : 'Confirm'}
               </button>
             </div>
           </motion.div>

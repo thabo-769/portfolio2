@@ -36,7 +36,7 @@ export const ResumeModal: React.FC<ResumeModalProps> = ({ isOpen, onClose }) => 
     const resumeText = `THABO TSHABANGU
 Software Developer | Full-Stack & 3D Interactive Specialist
 Email: thabolanez4@gmail.com | Location: Zimbabwe
-Website: https://thabo.dev | GitHub: https://github.com/thabotshabangu
+Website: https://thabo.dev | GitHub: https://github.com/thabo-769
 
 ========================================
 PROFESSIONAL SUMMARY
