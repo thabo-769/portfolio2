@@ -6,7 +6,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/admin/:path*",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
