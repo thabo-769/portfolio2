@@ -14,7 +14,7 @@ export const Projects: React.FC = () => {
   };
 
   return (
-    <section id="projects" className="relative overflow-hidden border-t border-white/10 bg-[#050505] py-24 sm:py-32">
+    <section id="projects" className="relative overflow-hidden border-t border-white/10 bg-[#050505] py-20 sm:py-28">
       <div className="pointer-events-none absolute -right-24 top-16 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
@@ -22,8 +22,8 @@ export const Projects: React.FC = () => {
             <FolderKanban className="h-3.5 w-3.5" />
             Selected work
           </div>
-          <h2 className="mt-5 text-4xl font-semibold uppercase tracking-tight text-white sm:text-6xl">Projects</h2>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+          <h2 className="mt-4 text-4xl font-semibold uppercase tracking-tight text-white sm:text-5xl">Projects</h2>
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
             A live collection of products, experiments, and digital experiences built with care.
           </p>
         </div>
@@ -45,7 +45,7 @@ export const Projects: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="mt-12 grid gap-6 lg:grid-cols-2">
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {published.map((project, index) => (
               <motion.article
                 key={project.id}
@@ -54,9 +54,9 @@ export const Projects: React.FC = () => {
                 viewport={{ once: true, amount: 0.18 }}
                 transition={{ duration: 0.45, delay: index * 0.06 }}
               >
-                <Project3DPreview className="group h-full rounded-[2rem] border border-white/10 bg-[#0C0C0C]">
+                <Project3DPreview className="group h-full rounded-2xl border border-white/10 bg-[#0C0C0C]">
                   <div className="flex h-full flex-col">
-                    <div className="relative aspect-[16/10] overflow-hidden bg-[#111113]">
+                    <div className="relative aspect-[16/9] overflow-hidden bg-[#111113]">
                       {project.image ? (
                         <img
                           src={project.image}
@@ -71,36 +71,36 @@ export const Projects: React.FC = () => {
                       )}
                       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                       {project.category && (
-                        <span className="absolute bottom-4 left-4 rounded-full border border-white/20 bg-black/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur-md">
+                        <span className="absolute bottom-3 left-3 rounded-full border border-white/20 bg-black/60 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-md">
                           {project.category}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex flex-1 flex-col p-6 sm:p-7">
-                      <h3 className="text-2xl font-semibold tracking-tight text-white">{project.name}</h3>
-                      <p className="mt-3 flex-1 text-sm leading-relaxed text-zinc-400 sm:text-base">
+                    <div className="flex flex-1 flex-col p-4 sm:p-5">
+                      <h3 className="text-xl font-semibold tracking-tight text-white">{project.name}</h3>
+                      <p className="mt-2 flex-1 text-xs leading-relaxed text-zinc-400 sm:text-sm">
                         {project.description || project.shortDescription}
                       </p>
 
                       {project.technologies.length > 0 && (
-                        <div className="mt-5 flex flex-wrap gap-2">
+                        <div className="mt-4 flex flex-wrap gap-1.5">
                           {project.technologies.slice(0, 5).map(technology => (
-                            <span key={technology} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-zinc-300">
+                            <span key={technology} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-zinc-300">
                               {technology}
                             </span>
                           ))}
                         </div>
                       )}
 
-                      <div className="mt-7 flex flex-wrap gap-3">
+                      <div className="mt-5 flex flex-wrap gap-2">
                         {project.liveUrl && (
                           <a
                             href={project.liveUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => trackProjectAction('live_click', project.id)}
-                            className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-zinc-200"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-zinc-200"
                           >
                             View live
                             <ExternalLink className="h-4 w-4" />
@@ -112,7 +112,7 @@ export const Projects: React.FC = () => {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => trackProjectAction('github_click', project.id)}
-                            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/10"
                           >
                             GitHub
                             <Github className="h-4 w-4" />

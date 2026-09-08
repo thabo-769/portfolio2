@@ -3,7 +3,6 @@ import { Quote, PlusCircle, ShieldCheck, Star } from 'lucide-react';
 import { AddReferralModal } from '../UI/AddReferralModal';
 import { useTheme } from '../../context/ThemeContext';
 import { usePortfolioCms } from '../../context/PortfolioCmsContext';
-import { initialReferrals } from '../../data/referrals';
 
 export const Referrals: React.FC = () => {
   const { playSound } = useTheme();
@@ -12,8 +11,7 @@ export const Referrals: React.FC = () => {
 
   const visibleReferrals = useMemo(
     () => {
-      const source = referrals.length > 0 ? referrals : initialReferrals;
-      return source
+      return referrals
         .filter(referral => !referral.isDeleted)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     },
