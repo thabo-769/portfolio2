@@ -839,6 +839,20 @@ export async function upsertProject(project: Project, imageUrl?: string, imagePa
   return project.id;
 }
 
+export async function migrateLocalProjectsToFirebase(): Promise<number> {
+  if (!isFirebaseConfigured()) {
+    throw new Error('Firebase is not configured. Add the Firebase environment variables first.');
+  }
+
+  const localProjects = readProjectsLocal();
+  await Promise.all(
+    localProjects.map(project =>
+      setDoc(doc(getFirestoreDB(), 'projects', project.id), { ...project, updatedAt: now() }, { merge: true })
+    )
+  );
+  return localProjects.length;
+}
+
 export async function createProjectEntry(project: Project, imageUrl?: string): Promise<string> {
   const id = project.id || createId('project');
   const payload = {

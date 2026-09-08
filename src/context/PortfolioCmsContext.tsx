@@ -10,6 +10,7 @@ import {
   getDefaultContent,
   getDefaultSettings,
   getLocalAnalyticsSummary,
+  migrateLocalProjectsToFirebase,
   recordActivity,
   recordAnalyticsEvent,
   permanentlyDeleteProjectEntry,
@@ -78,6 +79,7 @@ interface PortfolioCmsContextValue {
     settings: string | null;
   };
   saveProject: (project: Project, imageUrl?: string) => Promise<string>;
+  migrateLocalProjectsToFirebase: () => Promise<number>;
   uploadProjectImage: (file: File, projectId: string, onProgress?: (progress: number) => void) => Promise<{ url: string; path: string }>;
   trashProject: (projectId: string) => Promise<void>;
   restoreProject: (projectId: string) => Promise<void>;
@@ -228,6 +230,7 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         });
         return project.id;
       },
+      migrateLocalProjectsToFirebase,
       uploadProjectImage: async (file: File, projectId: string, onProgress?: (progress: number) => void) =>
         uploadProjectImageEntry(file, projectId, onProgress),
       trashProject: async (projectId: string) => {

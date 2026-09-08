@@ -16,6 +16,7 @@ import {
   ToggleLeft,
   ToggleRight,
   Trash2,
+  UploadCloud,
   X,
 } from 'lucide-react';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
@@ -40,8 +41,17 @@ interface ProjectsManagerProps {
 }
 
 export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onAdd, onEdit }) => {
-  const { projects, loading, trashProject, toggleProjectFeatured, toggleProjectStatus, reorderProjects, logActivity } =
-    usePortfolioCms();
+  const {
+    projects,
+    loading,
+    notConfigured,
+    migrateLocalProjectsToFirebase,
+    trashProject,
+    toggleProjectFeatured,
+    toggleProjectStatus,
+    reorderProjects,
+    logActivity,
+  } = usePortfolioCms();
   const { toast } = useToast();
 
   const [query, setQuery] = useState('');
@@ -49,6 +59,19 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onAdd, onEdit 
   const [selected, setSelected] = useState<Project | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [migrating, setMigrating] = useState(false);
+
+  const handleMigrateLocalProjects = async () => {
+    setMigrating(true);
+    try {
+      const count = await migrateLocalProjectsToFirebase();
+      toast(`${count} local project${count === 1 ? '' : 's'} copied to Firebase.`, 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to copy local projects to Firebase.', 'error');
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const activeProjects = useMemo(
     () => projects.filter(project => !project.isDeleted).sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
@@ -217,14 +240,27 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onAdd, onEdit 
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition-all hover:bg-zinc-100"
-        >
-          <Plus className="h-4 w-4" />
-          Add project
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {!notConfigured && (
+            <button
+              type="button"
+              onClick={handleMigrateLocalProjects}
+              disabled={migrating}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+            >
+              {migrating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
+              Copy local projects
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onAdd}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-black transition-all hover:bg-zinc-100"
+          >
+            <Plus className="h-4 w-4" />
+            Add project
+          </button>
+        </div>
 
       </div>
 
