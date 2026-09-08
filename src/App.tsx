@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
@@ -11,10 +11,11 @@ import { Referrals } from './components/Sections/Referrals';
 import { Contact } from './components/Sections/Contact';
 import { PrimaryTechStrip } from './components/UI/PrimaryTechStrip';
 import { ResumeModal } from './components/UI/ResumeModal';
-import { AdminDashboard } from './admin/AdminDashboard';
 import { ToastProvider } from './admin/ToastContext';
 import { getFirebaseAnalytics } from './firebase/config';
 import { PortfolioCmsProvider, usePortfolioCms } from './context/PortfolioCmsContext';
+
+const AdminDashboard = lazy(() => import('./admin/AdminDashboard'));
 
 function Portfolio() {
   const [isResumeOpen, setIsResumeOpen] = useState<boolean>(false);
@@ -70,7 +71,14 @@ export function App() {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Portfolio />} />
-                <Route path="/admin" element={<AdminDashboard />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+                      <AdminDashboard />
+                    </Suspense>
+                  }
+                />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </BrowserRouter>
