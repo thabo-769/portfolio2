@@ -221,10 +221,15 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       errors,
       saveProject: async (project: Project, imageUrl?: string) => {
         await upsertProject(project, imageUrl, project.imagePath);
+        const nextProject = {
+          ...project,
+          image: imageUrl ?? project.image,
+          ...(project.imagePath ? { imagePath: project.imagePath } : {}),
+        };
         setProjects(current => {
           const next = [
             ...current.filter(item => item.id !== project.id),
-            { ...project, image: imageUrl ?? project.image, imagePath: project.imagePath },
+            nextProject,
           ];
           return next.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
         });

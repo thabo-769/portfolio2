@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from './ToastContext';
 import { Project } from '../types';
 import { ProjectDetailModal } from '../components/UI/ProjectDetailModal';
@@ -52,6 +53,7 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onAdd, onEdit 
     reorderProjects,
     logActivity,
   } = usePortfolioCms();
+  const { user, isAuthorized } = useAuth();
   const { toast } = useToast();
 
   const [query, setQuery] = useState('');
@@ -241,7 +243,7 @@ export const ProjectsManager: React.FC<ProjectsManagerProps> = ({ onAdd, onEdit 
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {!notConfigured && (
+          {!notConfigured && user && isAuthorized && (
             <button
               type="button"
               onClick={handleMigrateLocalProjects}

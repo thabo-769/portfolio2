@@ -218,6 +218,30 @@ function tsToNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function stripUndefinedFields<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .map(item => stripUndefinedFields(item))
+      .filter(item => item !== undefined) as T;
+  }
+
+  if (isPlainObject(value)) {
+    const next: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (item !== undefined) {
+        next[key] = stripUndefinedFields(item);
+      }
+    }
+    return next as T;
+  }
+
+  return value;
+}
+
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : [];
 }
@@ -232,7 +256,7 @@ async function isAdminUser(user: User | null): Promise<boolean> {
   if (!user) return false;
   if (user.email?.trim().toLowerCase() === ADMIN_EMAIL) return true;
   try {
-    const token = await user.getIdTokenResult();
+    const token = await user.getIdTokenResult(true);
     return token.claims.admin === true;
   } catch {
     return false;
@@ -662,9 +686,40 @@ export function subscribeToReferrals(onUpdate: CollectionListener<Referral>): Un
   if (!isFirebaseConfigured()) {
     return subscribeLocalList(KEYS.referrals, initialReferrals, onUpdate);
   }
-  return subscribeFirestoreList('referrals', (id, raw) => normalizeReferral(raw, id), (items, error) => {
-    onUpdate(sortByDisplayOrder(items), error);
+
+  let firestoreUnsubscribe: Unsubscribe = () => undefined;
+  let subscriptionVersion = 0;
+  const authUnsubscribe = onAuthStateChanged(getFirebaseAuth(), user => {
+    const currentVersion = ++subscriptionVersion;
+    firestoreUnsubscribe();
+    void isAdminUser(user).then(isAdmin => {
+      if (currentVersion !== subscriptionVersion) return;
+
+      const referralsQuery = isAdmin
+        ? collection(getFirestoreDB(), 'referrals')
+        : query(
+            collection(getFirestoreDB(), 'referrals'),
+            where('isDeleted', '==', false)
+          );
+
+      firestoreUnsubscribe = onSnapshot(
+        referralsQuery,
+        snapshot => onUpdate(
+          sortByDisplayOrder(snapshot.docs.map(docSnap =>
+            normalizeReferral(docSnap.data() as Record<string, unknown>, docSnap.id)
+          )),
+          null
+        ),
+        error => onUpdate([], error instanceof Error ? error.message : 'Unable to load referrals.')
+      );
+    });
   });
+
+  return () => {
+    subscriptionVersion += 1;
+    authUnsubscribe();
+    firestoreUnsubscribe();
+  };
 }
 
 export function subscribeToMessages(onUpdate: CollectionListener<ContactMessage>): Unsubscribe {
@@ -731,12 +786,12 @@ function removeListItem<T extends { id: string }>(items: T[], id: string): T[] {
 
 function updateFirestoreListDoc(collectionName: string, itemId: string, payload: Record<string, unknown>): Promise<void> {
   const db = getFirestoreDB();
-  return setDoc(doc(db, collectionName, itemId), payload, { merge: true });
+  return setDoc(doc(db, collectionName, itemId), stripUndefinedFields(payload), { merge: true });
 }
 
 function updateFirestoreListExisting(collectionName: string, itemId: string, payload: Record<string, unknown>): Promise<void> {
   const db = getFirestoreDB();
-  return updateDoc(doc(db, collectionName, itemId), payload);
+  return updateDoc(doc(db, collectionName, itemId), stripUndefinedFields(payload));
 }
 
 function deleteFirestoreListDoc(collectionName: string, itemId: string): Promise<void> {
@@ -760,7 +815,7 @@ async function createEntry(collectionName: string, data: Record<string, unknown>
     return id;
   }
   const db = getFirestoreDB();
-  const docRef = await addDoc(collection(db, collectionName), data);
+  const docRef = await addDoc(collection(db, collectionName), stripUndefinedFields(data));
   return docRef.id;
 }
 
@@ -784,7 +839,7 @@ export async function recordActivity(entry: Omit<ActivityLogEntry, 'id' | 'creat
     return;
   }
   try {
-    await addDoc(collection(getFirestoreDB(), 'activity'), payload);
+    await addDoc(collection(getFirestoreDB(), 'activity'), stripUndefinedFields(payload));
   } catch {
     // Activity history must never make a successfully saved project fail.
     const existing = readActivityLocal();
@@ -819,7 +874,7 @@ export async function recordAnalyticsEvent(event: Omit<AnalyticsEvent, 'id' | 'c
     writeAnalyticsLocal(sortByNewest([next, ...existing]));
     return;
   }
-  await addDoc(collection(getFirestoreDB(), 'analytics'), payload);
+  await addDoc(collection(getFirestoreDB(), 'analytics'), stripUndefinedFields(payload));
 }
 
 export async function upsertProject(project: Project, imageUrl?: string, imagePath?: string): Promise<string> {
@@ -844,10 +899,20 @@ export async function migrateLocalProjectsToFirebase(): Promise<number> {
     throw new Error('Firebase is not configured. Add the Firebase environment variables first.');
   }
 
+  const user = getFirebaseAuth().currentUser;
+  if (!user) {
+    throw new Error('Please sign in with the authorized admin account before copying local projects to Firebase.');
+  }
+  await user.getIdToken(true);
+
   const localProjects = readProjectsLocal();
   await Promise.all(
     localProjects.map(project =>
-      setDoc(doc(getFirestoreDB(), 'projects', project.id), { ...project, updatedAt: now() }, { merge: true })
+      setDoc(
+        doc(getFirestoreDB(), 'projects', project.id),
+        stripUndefinedFields({ ...project, updatedAt: now() }),
+        { merge: true }
+      )
     )
   );
   return localProjects.length;
@@ -868,7 +933,7 @@ export async function createProjectEntry(project: Project, imageUrl?: string): P
     writeProjectsLocal(sortByDisplayOrder(next));
     return id;
   }
-  await setDoc(doc(getFirestoreDB(), 'projects', id), payload, { merge: true });
+  await setDoc(doc(getFirestoreDB(), 'projects', id), stripUndefinedFields(payload), { merge: true });
   return id;
 }
 
@@ -1311,7 +1376,7 @@ export async function uploadMediaEntry(file: File, category: MediaAsset['categor
     isDeleted: false,
   };
 
-  await setDoc(doc(getFirestoreDB(), 'media', mediaId), asset);
+  await setDoc(doc(getFirestoreDB(), 'media', mediaId), stripUndefinedFields(asset));
   return asset;
 }
 
@@ -1336,7 +1401,7 @@ export async function updateContentEntry(content: PortfolioContent): Promise<voi
     writeContentLocal(next);
     return;
   }
-  await setDoc(doc(getFirestoreDB(), 'content', DOC_IDS.content), next, { merge: true });
+  await setDoc(doc(getFirestoreDB(), 'content', DOC_IDS.content), stripUndefinedFields(next), { merge: true });
 }
 
 export async function updateSettingsEntry(settings: PortfolioSettings): Promise<void> {
@@ -1345,7 +1410,7 @@ export async function updateSettingsEntry(settings: PortfolioSettings): Promise<
     writeSettingsLocal(next);
     return;
   }
-  await setDoc(doc(getFirestoreDB(), 'settings', DOC_IDS.settings), next, { merge: true });
+  await setDoc(doc(getFirestoreDB(), 'settings', DOC_IDS.settings), stripUndefinedFields(next), { merge: true });
 }
 
 export function deriveAnalyticsSummary(events: AnalyticsEvent[]): AnalyticsSummary {

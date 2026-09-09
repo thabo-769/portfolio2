@@ -112,7 +112,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async (): Promise<User> => {
     const u = await fbSignInWithGoogle();
+    const authorized = await hasAdminAccess(u, true);
+    if (!authorized) {
+      await fbSignOut().catch(() => undefined);
+      setUser(null);
+      setIsAuthorized(false);
+      const authorizationError = new Error('This Google account is not authorized to manage portfolio data.');
+      Object.assign(authorizationError, { code: 'auth/admin-not-authorized' });
+      throw authorizationError;
+    }
     setUser(u);
+    setIsAuthorized(true);
     return u;
   };
 

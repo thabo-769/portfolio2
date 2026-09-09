@@ -194,6 +194,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
     try {
       const id = editing?.id ?? projectIdRef.current;
       const projectName = deriveProjectName();
+      const imagePath = form.imagePath.trim();
       const project: Project = {
         id,
         name: projectName,
@@ -205,7 +206,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
           .map(item => item.trim())
           .filter(Boolean),
         image: form.imageUrl.trim(),
-        imagePath: form.imagePath.trim() || undefined,
+        ...(imagePath ? { imagePath } : {}),
         images: form.galleryUrls
           .split(',')
           .map(item => item.trim())

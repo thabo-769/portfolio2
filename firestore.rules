@@ -45,7 +45,8 @@ service cloud.firestore {
     }
 
     match /referrals/{referralId} {
-      allow read: if resource.data.isDeleted == false;
+      // Admins can manage the full referrals list; visitors only see active entries.
+      allow read: if isAdmin() || resource.data.isDeleted == false;
       allow write: if isAdmin();
     }
 

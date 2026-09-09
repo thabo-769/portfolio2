@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeftRight, Loader2, LockKeyhole } from 'lucide-react';
+import { ArrowLeftRight, Chrome, Loader2, LockKeyhole } from 'lucide-react';
 import { DashboardLayout, AdminSection } from './DashboardLayout';
 import { Overview } from './Overview';
 import { ContentSection } from './ContentSection';
@@ -20,13 +20,13 @@ import type { Project } from '../types';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signIn, signOut, isAuthorized } = useAuth();
+  const { user, signIn, signInWithGoogle, signOut, isAuthorized } = useAuth();
   const { toast } = useToast();
   const { settings, projects, messages, loading: cmsLoading, notConfigured } = usePortfolioCms();
 
   const [section, setSection] = useState<AdminSection>('overview');
   const [demoMode] = useState<boolean>(() =>
-    import.meta.env.VITE_FREE_DASHBOARD_ACCESS !== 'false' || !import.meta.env.VITE_FIREBASE_API_KEY
+    import.meta.env.VITE_FREE_DASHBOARD_ACCESS === 'true' || !import.meta.env.VITE_FIREBASE_API_KEY
   );
   const [globalSearch, setGlobalSearch] = useState('');
   const [unlocked, setUnlocked] = useState(demoMode);
@@ -71,7 +71,14 @@ export const AdminDashboard: React.FC = () => {
   }
 
   if (!unlocked) {
-    return <DashboardUnlock demoMode={demoMode} onUnlock={() => setUnlocked(true)} signIn={signIn} />;
+    return (
+      <DashboardUnlock
+        demoMode={demoMode}
+        onUnlock={() => setUnlocked(true)}
+        signIn={signIn}
+        signInWithGoogle={signInWithGoogle}
+      />
+    );
   }
 
   if (!demoMode && !isAuthorized) {
@@ -174,16 +181,29 @@ function DashboardUnlock({
   demoMode,
   onUnlock,
   signIn,
+  signInWithGoogle,
 }: {
   demoMode: boolean;
   onUnlock: () => void;
   signIn: (email: string, password: string) => Promise<unknown>;
+  signInWithGoogle: () => Promise<unknown>;
 }) {
   const startX = useRef<number | null>(null);
   const [email, setEmail] = useState(import.meta.env.VITE_ADMIN_EMAIL?.trim() || '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const formatSignInError = (signInError: unknown): string => {
+    const errorCode = signInError && typeof signInError === 'object' && 'code' in signInError
+      ? String((signInError as { code?: unknown }).code)
+      : '';
+    return errorCode === 'auth/configuration-not-found'
+      ? 'Google or email sign-in is not enabled for this Firebase project.'
+      : signInError instanceof Error
+        ? signInError.message
+        : 'Sign in failed. Please try again.';
+  };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
@@ -228,16 +248,7 @@ function DashboardUnlock({
             await signIn(email.trim(), password);
             onUnlock();
           } catch (signInError) {
-            const errorCode = signInError && typeof signInError === 'object' && 'code' in signInError
-              ? String((signInError as { code?: unknown }).code)
-              : '';
-            setError(
-              errorCode === 'auth/configuration-not-found'
-                ? 'Email and password sign-in is not enabled for this Firebase project.'
-                : signInError instanceof Error
-                  ? signInError.message
-                  : 'Sign in failed. Check your credentials and try again.'
-            );
+            setError(formatSignInError(signInError));
           } finally {
             setSubmitting(false);
           }
@@ -255,6 +266,35 @@ function DashboardUnlock({
             {submitting ? 'Signing in...' : 'Sign in'}
             <ArrowLeftRight className="h-4 w-4" />
           </button>
+          {!demoMode && (
+            <>
+              <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#71717A]">
+                <span className="h-px flex-1 bg-white/10" />
+                <span>or</span>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={async () => {
+                  setError('');
+                  setSubmitting(true);
+                  try {
+                    await signInWithGoogle();
+                    onUnlock();
+                  } catch (signInError) {
+                    setError(formatSignInError(signInError));
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+              >
+                <Chrome className="h-4 w-4" />
+                Continue with Google
+              </button>
+            </>
+          )}
           {demoMode && <p className="text-center text-xs text-zinc-500">Demo mode: click Sign in to open the dashboard.</p>}
         </form>
       </div>
