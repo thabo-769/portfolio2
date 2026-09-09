@@ -181,8 +181,11 @@ function DashboardUnlock({
     const errorCode = signInError && typeof signInError === 'object' && 'code' in signInError
       ? String((signInError as { code?: unknown }).code)
       : '';
+    if (errorCode === 'auth/unauthorized-domain') {
+      return 'Domain authorization required: Add "thabo-tshabangu-3d-portfolio.vercel.app" to Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+    }
     if (errorCode === 'auth/configuration-not-found' || errorCode === 'auth/operation-not-allowed') {
-      return 'Google sign-in is not enabled in Firebase Authentication console yet.';
+      return 'Google sign-in is not enabled in Firebase Authentication console yet. Please enable Google under Authentication -> Sign-in method.';
     }
     if (errorCode === 'auth/popup-closed-by-user') {
       return 'Sign-in window was closed before completion.';
