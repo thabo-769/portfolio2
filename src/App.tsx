@@ -82,14 +82,33 @@ class ErrorBoundary extends React.Component<
           <div className="max-w-md space-y-4 rounded-3xl border border-white/10 bg-[#0C0C0C] p-8 shadow-2xl">
             <h1 className="text-2xl font-bold tracking-tight">Something went wrong</h1>
             <p className="text-xs leading-relaxed text-zinc-400">
-              An unexpected error occurred while rendering the page. Click below to reload.
+              An unexpected rendering error occurred. You can reset local storage cache and reload.
             </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 rounded-full bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-black transition-colors hover:bg-zinc-200"
-            >
-              Reload Page
-            </button>
+            {this.state.error && (
+              <div className="max-h-36 overflow-y-auto rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-left font-mono text-[11px] text-red-300">
+                {this.state.error.message || String(this.state.error)}
+              </div>
+            )}
+            <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-center">
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('thabo_cms_custom_projects_v1');
+                    localStorage.removeItem('thabo_cms_projects_v1');
+                  } catch {}
+                  window.location.reload();
+                }}
+                className="rounded-full bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-black transition-colors hover:bg-zinc-200"
+              >
+                Clear Cache & Reload
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-white/10"
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
         </div>
       );

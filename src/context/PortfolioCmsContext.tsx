@@ -103,11 +103,23 @@ function readLocalCustomProjects(): Project[] {
   try {
     const rawCustom = localStorage.getItem(CUSTOM_PROJECTS_KEY);
     const rawLocal = localStorage.getItem(LOCAL_PROJECTS_KEY);
-    const listCustom: Project[] = rawCustom ? JSON.parse(rawCustom) : [];
-    const listLocal: Project[] = rawLocal ? JSON.parse(rawLocal) : [];
+    const listCustom = rawCustom ? JSON.parse(rawCustom) : [];
+    const listLocal = rawLocal ? JSON.parse(rawLocal) : [];
     const map = new Map<string, Project>();
-    listCustom.forEach(p => map.set(p.id, p));
-    listLocal.forEach(p => map.set(p.id, p));
+    if (Array.isArray(listCustom)) {
+      listCustom.forEach(p => {
+        if (p && typeof p === 'object' && p.id) {
+          map.set(String(p.id), p as Project);
+        }
+      });
+    }
+    if (Array.isArray(listLocal)) {
+      listLocal.forEach(p => {
+        if (p && typeof p === 'object' && p.id) {
+          map.set(String(p.id), p as Project);
+        }
+      });
+    }
     return Array.from(map.values());
   } catch {
     return [];
@@ -117,7 +129,8 @@ function readLocalCustomProjects(): Project[] {
 function readLocalHiddenProjectIds(): string[] {
   try {
     const raw = localStorage.getItem(HIDDEN_PROJECTS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
   } catch {
     return [];
   }
@@ -204,12 +217,12 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const projects = useMemo(() => {
     // Deduplicate by ID prioritizing Firestore -> Custom -> GitHub
     const map = new Map<string, Project>();
-    gitHubProjects.forEach(p => map.set(p.id, p));
-    customProjects.forEach(p => map.set(p.id, p));
-    firestoreProjects.forEach(p => map.set(p.id, p));
+    (gitHubProjects || []).forEach(p => p && p.id && map.set(String(p.id), p));
+    (customProjects || []).forEach(p => p && p.id && map.set(String(p.id), p));
+    (firestoreProjects || []).forEach(p => p && p.id && map.set(String(p.id), p));
 
     const combined = Array.from(map.values());
-    return combined.filter(p => !p.isDeleted && !hiddenProjectIds.includes(p.id));
+    return combined.filter(p => p && !p.isDeleted && !hiddenProjectIds.includes(p.id));
   }, [gitHubProjects, firestoreProjects, customProjects, hiddenProjectIds]);
 
   useEffect(() => subscribeToSkills((items, error) => {

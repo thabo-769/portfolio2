@@ -24,14 +24,15 @@ export function useProjects(): ProjectCollectionState {
   const { projects, loading, errors, notConfigured } = usePortfolioCms();
 
   return useMemo(() => {
-    const active = projects.filter(p => !p.isDeleted);
-    const trash = projects.filter(p => p.isDeleted);
+    const safeProjects = Array.isArray(projects) ? projects.filter(Boolean) : [];
+    const active = safeProjects.filter(p => p && !p.isDeleted);
+    const trash = safeProjects.filter(p => p && p.isDeleted);
     const publishedFromCms = active
-      .filter(p => p.status === 'Published')
+      .filter(p => p && p.status === 'Published')
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     const published = publishedFromCms;
     const sortedActive = [...active].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     const sortedTrash = [...trash].sort((a, b) => (b.deletedAt ?? b.updatedAt ?? 0) - (a.deletedAt ?? a.updatedAt ?? 0));
-    return { all: projects, active: sortedActive, trash: sortedTrash, published, loading, error: errors.projects, notConfigured };
+    return { all: safeProjects, active: sortedActive, trash: sortedTrash, published, loading, error: errors.projects, notConfigured };
   }, [projects, loading, errors.projects, notConfigured]);
 }
