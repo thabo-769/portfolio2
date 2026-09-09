@@ -175,6 +175,7 @@ function DashboardUnlock({
   const [password, setPassword] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [error, setError] = useState('');
+  const [unauthorizedDomainError, setUnauthorizedDomainError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const formatSignInError = (signInError: unknown): string => {
@@ -182,7 +183,9 @@ function DashboardUnlock({
       ? String((signInError as { code?: unknown }).code)
       : '';
     if (errorCode === 'auth/unauthorized-domain') {
-      return 'Domain authorization required: Add "thabo-tshabangu-3d-portfolio.vercel.app" to Firebase Console -> Authentication -> Settings -> Authorized Domains.';
+      setUnauthorizedDomainError(true);
+      setShowEmailForm(true);
+      return 'Domain authorization required: "thabo-tshabangu-3d-portfolio.vercel.app" is not yet added to Firebase Console Authorized Domains.';
     }
     if (errorCode === 'auth/configuration-not-found' || errorCode === 'auth/operation-not-allowed') {
       return 'Google sign-in is not enabled in Firebase Authentication console yet. Please enable Google under Authentication -> Sign-in method.';
@@ -195,6 +198,7 @@ function DashboardUnlock({
 
   const handleGoogleSignIn = async () => {
     setError('');
+    setUnauthorizedDomainError(false);
     setSubmitting(true);
     try {
       await signInWithGoogle();
@@ -219,8 +223,21 @@ function DashboardUnlock({
         </p>
 
         {error && (
-          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs leading-relaxed text-red-300">
-            {error}
+          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs leading-relaxed text-red-300 space-y-2">
+            <div>{error}</div>
+            {unauthorizedDomainError && (
+              <div className="pt-2 border-t border-red-500/20">
+                <a
+                  href="https://console.firebase.google.com/project/portfolio-database-8b7f8/authentication/settings"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 font-bold underline hover:text-white transition-colors"
+                >
+                  <Chrome className="h-3.5 w-3.5" />
+                  Open Firebase Settings to Add Domain
+                </a>
+              </div>
+            )}
           </div>
         )}
 
