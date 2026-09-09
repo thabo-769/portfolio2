@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   FileText,
+  FolderKanban,
   LayoutDashboard,
   LayoutGrid,
   LogOut,
@@ -57,6 +58,7 @@ const NAV_GROUPS: Array<{
     label: 'Portfolio',
     items: [
       { id: 'content', label: 'Content', icon: <FileText className="h-4.5 w-4.5" /> },
+      { id: 'projects', label: 'Projects', icon: <FolderKanban className="h-4.5 w-4.5" /> },
     ],
   },
   {

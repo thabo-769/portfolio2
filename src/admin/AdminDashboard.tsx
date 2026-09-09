@@ -4,6 +4,7 @@ import { ArrowLeftRight, Chrome, Loader2, LockKeyhole } from 'lucide-react';
 import { DashboardLayout, AdminSection } from './DashboardLayout';
 import { Overview } from './Overview';
 import { ContentSection } from './ContentSection';
+import { ProjectsManager } from './ProjectsManager';
 import { MessagesSection } from './MessagesSection';
 import { AnalyticsSection } from './AnalyticsSection';
 import { ActivitySection } from './ActivitySection';
@@ -92,6 +93,8 @@ export const AdminDashboard: React.FC = () => {
         return <Overview onNavigate={setSection} />;
       case 'content':
         return <ContentSection />;
+      case 'projects':
+        return <ProjectsManager />;
       case 'messages':
         return <MessagesSection />;
       case 'remoteDevices':

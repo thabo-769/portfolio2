@@ -69,6 +69,8 @@ interface PortfolioCmsContextValue {
     content: string | null;
     settings: string | null;
   };
+  saveProject: (projectInput: Partial<Project>) => Promise<string>;
+  deleteProject: (projectId: string) => Promise<void>;
   saveSkill: (skill: Skill) => Promise<string>;
   deleteSkill: (skillId: string) => Promise<void>;
   reorderSkills: (skillIds: string[]) => Promise<void>;
@@ -90,8 +92,31 @@ interface PortfolioCmsContextValue {
 
 const PortfolioCmsContext = createContext<PortfolioCmsContextValue | undefined>(undefined);
 
+const CUSTOM_PROJECTS_KEY = 'thabo_cms_custom_projects_v1';
+const HIDDEN_PROJECTS_KEY = 'thabo_cms_hidden_projects_v1';
+
+function readLocalCustomProjects(): Project[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PROJECTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readLocalHiddenProjectIds(): string[] {
+  try {
+    const raw = localStorage.getItem(HIDDEN_PROJECTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
 export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [gitHubProjects, setGitHubProjects] = useState<Project[]>([]);
+  const [customProjects, setCustomProjects] = useState<Project[]>(readLocalCustomProjects);
+  const [hiddenProjectIds, setHiddenProjectIds] = useState<string[]>(readLocalHiddenProjectIds);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
@@ -128,7 +153,7 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     fetchGitHubProjects()
       .then(items => {
-        setProjects(items);
+        setGitHubProjects(items);
         setErrors(prev => ({ ...prev, projects: null }));
       })
       .catch(error => {
@@ -138,6 +163,11 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setHydrated(prev => ({ ...prev, projects: true }));
       });
   }, []);
+
+  const projects = useMemo(() => {
+    const combined = [...customProjects, ...gitHubProjects];
+    return combined.filter(p => !p.isDeleted && !hiddenProjectIds.includes(p.id));
+  }, [gitHubProjects, customProjects, hiddenProjectIds]);
 
   useEffect(() => subscribeToSkills((items, error) => {
     setSkills(items);
@@ -209,6 +239,64 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       loading,
       notConfigured,
       errors,
+      saveProject: async (input: Partial<Project>) => {
+        const id = input.id || `custom-${Date.now()}`;
+        const newProject: Project = {
+          id,
+          name: input.name || 'Untitled Project',
+          shortDescription: input.shortDescription || input.description || '',
+          description: input.description || input.shortDescription || '',
+          category: input.category || 'Personal',
+          technologies: input.technologies && input.technologies.length > 0 ? input.technologies : ['TypeScript', 'React'],
+          image: input.image || '',
+          images: input.images || [],
+          githubUrl: input.githubUrl || '',
+          liveUrl: input.liveUrl || input.githubUrl || '',
+          status: input.status || 'Published',
+          featured: input.featured ?? true,
+          displayOrder: input.displayOrder ?? 0,
+          completionDate: input.completionDate || new Date().toISOString(),
+          client: input.client || '',
+          projectType: input.projectType || 'Software Project',
+          features: input.features || [],
+          challenges: input.challenges || '',
+          solutions: input.solutions || '',
+          results: input.results || '',
+          createdAt: input.createdAt || Date.now(),
+          updatedAt: Date.now(),
+          deletedAt: null,
+          isDeleted: false,
+        };
+
+        setCustomProjects(current => {
+          const filtered = current.filter(p => p.id !== id);
+          const next = [newProject, ...filtered];
+          try {
+            localStorage.setItem(CUSTOM_PROJECTS_KEY, JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+
+        return id;
+      },
+      deleteProject: async (projectId: string) => {
+        setCustomProjects(current => {
+          const next = current.filter(p => p.id !== projectId);
+          try {
+            localStorage.setItem(CUSTOM_PROJECTS_KEY, JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+
+        setHiddenProjectIds(current => {
+          if (current.includes(projectId)) return current;
+          const next = [...current, projectId];
+          try {
+            localStorage.setItem(HIDDEN_PROJECTS_KEY, JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      },
       saveSkill: async (skill: Skill) => saveSkillEntry(skill),
       deleteSkill: async (skillId: string) => deleteSkillEntry(skillId),
       reorderSkills: async (skillIds: string[]) => reorderSkills(skillIds),
