@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import {
   archiveMessageEntry,
   createMessageEntry,
+  createProjectEntry,
   deleteMediaEntry,
   deleteMessageEntry,
   deleteReferralEntry,
@@ -10,6 +11,7 @@ import {
   getDefaultContent,
   getDefaultSettings,
   getLocalAnalyticsSummary,
+  permanentlyDeleteProjectEntry,
   recordActivity,
   recordAnalyticsEvent,
   reorderReferrals,
@@ -23,6 +25,7 @@ import {
   subscribeToContent,
   subscribeToMedia,
   subscribeToMessages,
+  subscribeToProjects,
   subscribeToReferrals,
   subscribeToSettings,
   subscribeToSkills,
@@ -115,6 +118,7 @@ function readLocalHiddenProjectIds(): string[] {
 
 export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [gitHubProjects, setGitHubProjects] = useState<Project[]>([]);
+  const [firestoreProjects, setFirestoreProjects] = useState<Project[]>([]);
   const [customProjects, setCustomProjects] = useState<Project[]>(readLocalCustomProjects);
   const [hiddenProjectIds, setHiddenProjectIds] = useState<string[]>(readLocalHiddenProjectIds);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -164,10 +168,25 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
   }, []);
 
+  useEffect(() => {
+    return subscribeToProjects((items, error) => {
+      setFirestoreProjects(items);
+      if (error) {
+        setErrors(prev => ({ ...prev, projects: error }));
+      }
+    });
+  }, []);
+
   const projects = useMemo(() => {
-    const combined = [...customProjects, ...gitHubProjects];
+    // Deduplicate by ID prioritizing Firestore -> Custom -> GitHub
+    const map = new Map<string, Project>();
+    gitHubProjects.forEach(p => map.set(p.id, p));
+    customProjects.forEach(p => map.set(p.id, p));
+    firestoreProjects.forEach(p => map.set(p.id, p));
+
+    const combined = Array.from(map.values());
     return combined.filter(p => !p.isDeleted && !hiddenProjectIds.includes(p.id));
-  }, [gitHubProjects, customProjects, hiddenProjectIds]);
+  }, [gitHubProjects, firestoreProjects, customProjects, hiddenProjectIds]);
 
   useEffect(() => subscribeToSkills((items, error) => {
     setSkills(items);
@@ -268,6 +287,7 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           isDeleted: false,
         };
 
+        // Save to Local Storage
         setCustomProjects(current => {
           const filtered = current.filter(p => p.id !== id);
           const next = [newProject, ...filtered];
@@ -277,9 +297,18 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           return next;
         });
 
+        // Save to Firestore Database
+        try {
+          await createProjectEntry(newProject, newProject.image);
+        } catch (err) {
+          console.warn('Firestore project save fallback to local storage:', err);
+        }
+
         return id;
       },
       deleteProject: async (projectId: string) => {
+        const target = projects.find(p => p.id === projectId);
+
         setCustomProjects(current => {
           const next = current.filter(p => p.id !== projectId);
           try {
@@ -296,6 +325,14 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           } catch {}
           return next;
         });
+
+        if (target) {
+          try {
+            await permanentlyDeleteProjectEntry(target);
+          } catch (err) {
+            console.warn('Firestore project delete fallback:', err);
+          }
+        }
       },
       saveSkill: async (skill: Skill) => saveSkillEntry(skill),
       deleteSkill: async (skillId: string) => deleteSkillEntry(skillId),

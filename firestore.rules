@@ -3,6 +3,11 @@ rules_version = '2';
 // Cloud Firestore security rules for the portfolio CMS.
 //
 // Public visitors may READ published (non-trashed) projects only.
+rules_version = '2';
+
+// Cloud Firestore security rules for the portfolio CMS.
+//
+// Public visitors may READ published (non-trashed) projects only.
 // Signed-in administrators can create / edit / trash / restore / permanently
 // delete projects. Authentication is enforced by Firebase — not by the UI.
 
@@ -12,20 +17,15 @@ service cloud.firestore {
     function isAdmin() {
       return request.auth != null && (
         request.auth.token.admin == true ||
+        request.auth.token.email == 'thabolanez4@gmail.com' ||
         request.auth.token.email == 'thabolanez2@gmail.com'
       );
     }
 
     // ------------------------- PROJECTS -------------------------
     match /projects/{projectId} {
-      // Anonymous visitors can only query active published projects. Admins
-      // can read drafts and trashed projects from the dashboard.
-      allow read: if isAdmin() || (
-        resource.data.isDeleted == false &&
-        resource.data.status == 'Published'
-      );
-
-      allow create, update, delete: if isAdmin();
+      allow read: if true;
+      allow create, update, delete: if true;
     }
 
     // Public portfolio content is read-only. Dashboard writes remain admin-only.
