@@ -163,9 +163,9 @@ function DashboardUnlock({
   signIn: (email: string, password: string) => Promise<unknown>;
   signInWithGoogle: () => Promise<unknown>;
 }) {
-  const startX = useRef<number | null>(null);
   const [email, setEmail] = useState(import.meta.env.VITE_ADMIN_EMAIL?.trim() || '');
   const [password, setPassword] = useState('');
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -173,105 +173,142 @@ function DashboardUnlock({
     const errorCode = signInError && typeof signInError === 'object' && 'code' in signInError
       ? String((signInError as { code?: unknown }).code)
       : '';
-    return errorCode === 'auth/configuration-not-found'
-      ? 'Google or email sign-in is not enabled for this Firebase project.'
-      : signInError instanceof Error
-        ? signInError.message
-        : 'Sign in failed. Please try again.';
+    if (errorCode === 'auth/configuration-not-found' || errorCode === 'auth/operation-not-allowed') {
+      return 'Google sign-in is not enabled in Firebase Authentication console yet.';
+    }
+    if (errorCode === 'auth/popup-closed-by-user') {
+      return 'Sign-in window was closed before completion.';
+    }
+    return signInError instanceof Error ? signInError.message : 'Sign in failed. Please try again.';
   };
 
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) return;
-    startX.current = event.clientX;
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) return;
-    if (startX.current === null) return;
-    const distance = event.clientX - startX.current;
-    startX.current = null;
-    if (Math.abs(distance) >= 70) onUnlock();
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      await signInWithGoogle();
+      onUnlock();
+    } catch (signInError) {
+      setError(formatSignInError(signInError));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div
-      className="admin-theme flex min-h-screen touch-pan-y select-none items-center justify-center bg-[#000000] px-6 text-white"
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={() => {
-        startX.current = null;
-      }}
-    >
+    <div className="admin-theme flex min-h-screen items-center justify-center bg-[#000000] px-6 text-white">
       <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#0C0C0C]/90 p-6 shadow-[0_0_60px_rgba(0,0,0,0.8)] backdrop-blur-xl sm:p-8">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-[#0C0C0C] text-white shadow-[0_0_40px_rgba(255,255,255,0.08)]">
           <LockKeyhole className="h-7 w-7" />
         </div>
-        <p className="mt-6 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-[#71717A]">Welcome back</p>
-        <h1 className="mt-3 text-center text-3xl font-bold uppercase tracking-tight">Sign in</h1>
-        <p className="mt-3 text-center text-sm leading-relaxed text-[#A1A1AA]">Continue to your portfolio workspace.</p>
+        <p className="mt-6 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-[#71717A]">Admin Access Required</p>
+        <h1 className="mt-2 text-center text-3xl font-bold uppercase tracking-tight">Sign in</h1>
+        <p className="mt-2 text-center text-xs leading-relaxed text-[#A1A1AA]">Sign in with your authorized Google account to manage your portfolio.</p>
 
-        <form className="mt-7 space-y-4" onSubmit={async event => {
-          event.preventDefault();
-          setError('');
-          if (demoMode) {
-            onUnlock();
-            return;
-          }
-          setSubmitting(true);
-          try {
-            await signIn(email.trim(), password);
-            onUnlock();
-          } catch (signInError) {
-            setError(formatSignInError(signInError));
-          } finally {
-            setSubmitting(false);
-          }
-        }}>
-          <label className="block space-y-2 text-left">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">Email</span>
-            <input type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/30" placeholder="you@example.com" required />
-          </label>
-          <label className="block space-y-2 text-left">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">Password</span>
-            <input type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none focus:border-white/30" placeholder="••••••••" required />
-          </label>
-          {error && <p className="rounded-2xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs leading-relaxed text-red-200">{error}</p>}
-          <button type="submit" disabled={submitting} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-xs font-bold uppercase tracking-wider text-black disabled:cursor-wait disabled:opacity-60">
-            {submitting ? 'Signing in...' : 'Sign in'}
-            <ArrowLeftRight className="h-4 w-4" />
+        {error && (
+          <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs leading-relaxed text-red-300">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-6 space-y-4">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={handleGoogleSignIn}
+            className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-white px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-black transition-all hover:bg-zinc-200 disabled:cursor-wait disabled:opacity-60 shadow-lg"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            {submitting ? 'Authenticating...' : 'Sign in with Google'}
           </button>
-          {!demoMode && (
-            <>
-              <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#71717A]">
-                <span className="h-px flex-1 bg-white/10" />
-                <span>or</span>
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
+
+          {!showEmailForm ? (
+            <button
+              type="button"
+              onClick={() => setShowEmailForm(true)}
+              className="w-full text-center text-[11px] font-medium text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              Sign in with Email & Password instead
+            </button>
+          ) : (
+            <form
+              className="space-y-3 pt-2 border-t border-white/10"
+              onSubmit={async event => {
+                event.preventDefault();
+                setError('');
+                if (demoMode) {
+                  onUnlock();
+                  return;
+                }
+                setSubmitting(true);
+                try {
+                  await signIn(email.trim(), password);
+                  onUnlock();
+                } catch (signInError) {
+                  setError(formatSignInError(signInError));
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+            >
+              <label className="block space-y-1.5 text-left">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">Email</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={event => setEmail(event.target.value)}
+                  autoComplete="email"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-xs text-white outline-none focus:border-white/30"
+                  placeholder="you@example.com"
+                  required
+                />
+              </label>
+              <label className="block space-y-1.5 text-left">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#A1A1AA]">Password</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                  autoComplete="current-password"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-xs text-white outline-none focus:border-white/30"
+                  placeholder="••••••••"
+                  required
+                />
+              </label>
               <button
-                type="button"
+                type="submit"
                 disabled={submitting}
-                onClick={async () => {
-                  setError('');
-                  setSubmitting(true);
-                  try {
-                    await signInWithGoogle();
-                    onUnlock();
-                  } catch (signInError) {
-                    setError(formatSignInError(signInError));
-                  } finally {
-                    setSubmitting(false);
-                  }
-                }}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-white hover:bg-white/10 disabled:opacity-60 transition-colors"
               >
-                <Chrome className="h-4 w-4" />
-                Continue with Google
+                {submitting ? 'Signing in...' : 'Sign in with Password'}
+                <ArrowLeftRight className="h-3.5 w-3.5" />
               </button>
-            </>
+            </form>
           )}
-          {demoMode && <p className="text-center text-xs text-zinc-500">Demo mode: click Sign in to open the dashboard.</p>}
-        </form>
+
+          {demoMode && (
+            <p className="pt-2 text-center text-[11px] leading-relaxed text-zinc-500">
+              Demo Mode is enabled locally. Clicking Sign in will unlock the workspace.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

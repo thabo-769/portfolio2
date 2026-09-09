@@ -28,15 +28,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const isConfigured = isFirebaseConfigured();
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase() || 'thabolanez2@gmail.com';
-  const [isAuthorized, setIsAuthorized] = useState<boolean>(!isConfigured);
+  const adminEmails = [
+    import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase(),
+    'thabolanez2@gmail.com',
+    'thabolanez4@gmail.com',
+  ].filter(Boolean) as string[];
 
   const hasAdminAccess = async (candidate: User, forceRefresh = false): Promise<boolean> => {
     try {
       const token = await candidate.getIdTokenResult(forceRefresh);
-      return token.claims.admin === true || candidate.email?.trim().toLowerCase() === adminEmail;
+      if (token.claims.admin === true) return true;
+      const userEmail = candidate.email?.trim().toLowerCase();
+      return !!userEmail && adminEmails.includes(userEmail);
     } catch {
-      return candidate.email?.trim().toLowerCase() === adminEmail;
+      const userEmail = candidate.email?.trim().toLowerCase();
+      return !!userEmail && adminEmails.includes(userEmail);
     }
   };
 
@@ -86,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       cancelled = true;
     };
-  }, [adminEmail, isConfigured, user]);
+  }, [isConfigured, user]);
 
   const signIn = async (email: string, password: string): Promise<User> => {
     const u = await fbSignIn(email, password);
@@ -95,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await fbSignOut().catch(() => undefined);
       setUser(null);
       setIsAuthorized(false);
-      const authorizationError = new Error('This Firebase account is not authorized to manage portfolio data.');
+      const authorizationError = new Error(`The account (${u.email || email}) is not authorized to access the admin dashboard.`);
       Object.assign(authorizationError, { code: 'auth/admin-not-authorized' });
       throw authorizationError;
     }
@@ -117,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await fbSignOut().catch(() => undefined);
       setUser(null);
       setIsAuthorized(false);
-      const authorizationError = new Error('This Google account is not authorized to manage portfolio data.');
+      const authorizationError = new Error(`The Google account (${u.email || 'unknown'}) is not authorized to access the admin dashboard.`);
       Object.assign(authorizationError, { code: 'auth/admin-not-authorized' });
       throw authorizationError;
     }
