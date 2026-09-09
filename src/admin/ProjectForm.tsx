@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Sparkles, Upload, Image as ImageIcon } from 'lucide-react';
+import { X, Sparkles, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
 import { useToast } from './ToastContext';
 import type { Project, ProjectCategory } from '../types';
@@ -60,24 +60,75 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
     }
   };
 
-  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [compressing, setCompressing] = useState(false);
+
+  const compressImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const src = ev.target?.result as string;
+        if (!src) {
+          reject(new Error('Failed to read image file'));
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(src);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          try {
+            const webp = canvas.toDataURL('image/webp', 0.82);
+            if (webp.startsWith('data:image/webp')) {
+              resolve(webp);
+              return;
+            }
+          } catch {}
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = () => reject(new Error('Failed to parse image element'));
+        img.src = src;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast('Image file size should be less than 5MB.', 'error');
+    if (file.size > 10 * 1024 * 1024) {
+      toast('Image file size should be less than 10MB.', 'error');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const result = ev.target?.result as string;
-      if (result) {
-        setImage(result);
-        toast('Image attached successfully!', 'success');
-      }
-    };
-    reader.readAsDataURL(file);
+    setCompressing(true);
+    try {
+      const compressedDataUrl = await compressImageFile(file);
+      setImage(compressedDataUrl);
+      toast('Image attached and optimized successfully!', 'success');
+    } catch (err) {
+      toast('Failed to process image file.', 'error');
+    } finally {
+      setCompressing(false);
+    }
   };
 
   return (
@@ -127,12 +178,22 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
             ) : (
               <div className="flex flex-col gap-3">
                 <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/20 bg-black/40 p-5 text-center transition-all hover:border-white/40 hover:bg-white/5">
-                  <Upload className="h-6 w-6 text-zinc-400 mb-2" />
-                  <span className="text-xs font-semibold text-white">Click to attach image file</span>
-                  <span className="mt-1 text-[10px] text-zinc-500">PNG, JPG, WebP, GIF up to 5MB</span>
+                  {compressing ? (
+                    <>
+                      <Loader2 className="h-6 w-6 animate-spin text-white mb-2" />
+                      <span className="text-xs font-semibold text-white">Compressing & optimizing image...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-6 w-6 text-zinc-400 mb-2" />
+                      <span className="text-xs font-semibold text-white">Click to attach image file</span>
+                      <span className="mt-1 text-[10px] text-zinc-500">PNG, JPG, WebP, GIF up to 10MB</span>
+                    </>
+                  )}
                   <input
                     type="file"
                     accept="image/*"
+                    disabled={compressing}
                     className="hidden"
                     onChange={handleFileAttach}
                   />

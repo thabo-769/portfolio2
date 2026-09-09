@@ -96,12 +96,19 @@ interface PortfolioCmsContextValue {
 const PortfolioCmsContext = createContext<PortfolioCmsContextValue | undefined>(undefined);
 
 const CUSTOM_PROJECTS_KEY = 'thabo_cms_custom_projects_v1';
+const LOCAL_PROJECTS_KEY = 'thabo_cms_projects_v1';
 const HIDDEN_PROJECTS_KEY = 'thabo_cms_hidden_projects_v1';
 
 function readLocalCustomProjects(): Project[] {
   try {
-    const raw = localStorage.getItem(CUSTOM_PROJECTS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const rawCustom = localStorage.getItem(CUSTOM_PROJECTS_KEY);
+    const rawLocal = localStorage.getItem(LOCAL_PROJECTS_KEY);
+    const listCustom: Project[] = rawCustom ? JSON.parse(rawCustom) : [];
+    const listLocal: Project[] = rawLocal ? JSON.parse(rawLocal) : [];
+    const map = new Map<string, Project>();
+    listCustom.forEach(p => map.set(p.id, p));
+    listLocal.forEach(p => map.set(p.id, p));
+    return Array.from(map.values());
   } catch {
     return [];
   }
@@ -293,7 +300,13 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const next = [newProject, ...filtered];
           try {
             localStorage.setItem(CUSTOM_PROJECTS_KEY, JSON.stringify(next));
-          } catch {}
+            localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(next));
+          } catch (err) {
+            console.warn('LocalStorage quota limit warning:', err);
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event(`${LOCAL_PROJECTS_KEY}:changed`));
+          }
           return next;
         });
 
@@ -313,7 +326,13 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const next = current.filter(p => p.id !== projectId);
           try {
             localStorage.setItem(CUSTOM_PROJECTS_KEY, JSON.stringify(next));
-          } catch {}
+            localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(next));
+          } catch (err) {
+            console.warn('LocalStorage delete warning:', err);
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event(`${LOCAL_PROJECTS_KEY}:changed`));
+          }
           return next;
         });
 

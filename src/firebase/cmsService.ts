@@ -927,13 +927,19 @@ export async function createProjectEntry(project: Project, imageUrl?: string): P
     createdAt: project.createdAt || now(),
     updatedAt: now(),
   };
-  if (!isFirebaseConfigured()) {
-    const existing = readProjectsLocal();
-    const next = saveListItem(KEYS.projects, existing, normalizeProject(payload as Record<string, unknown>, id));
-    writeProjectsLocal(sortByDisplayOrder(next));
-    return id;
+
+  // Always store in LocalStorage as reliable sync backup
+  const existing = readProjectsLocal();
+  const next = saveListItem(KEYS.projects, existing, normalizeProject(payload as Record<string, unknown>, id));
+  writeProjectsLocal(sortByDisplayOrder(next));
+
+  if (isFirebaseConfigured()) {
+    try {
+      await setDoc(doc(getFirestoreDB(), 'projects', id), stripUndefinedFields(payload), { merge: true });
+    } catch (err) {
+      console.warn('Firebase setDoc failed, project preserved in local storage:', err);
+    }
   }
-  await setDoc(doc(getFirestoreDB(), 'projects', id), stripUndefinedFields(payload), { merge: true });
   return id;
 }
 
