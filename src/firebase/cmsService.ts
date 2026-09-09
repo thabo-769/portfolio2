@@ -417,13 +417,13 @@ function normalizeAnalyticsEvent(raw: Record<string, unknown>, id: string): Anal
 }
 
 function normalizeContent(
-  raw: Record<string, unknown> | PortfolioContent,
+  raw: Record<string, unknown> | PortfolioContent | null | undefined,
   fallback = defaultPortfolioContent
 ): PortfolioContent {
-  const data = raw as Record<string, unknown>;
-  const home = (data.home as Record<string, unknown> | undefined) ?? fallback.home;
-  const about = (data.about as Record<string, unknown> | undefined) ?? fallback.about;
-  const contact = (data.contact as Record<string, unknown> | undefined) ?? fallback.contact;
+  const data = (raw && typeof raw === 'object' ? raw : fallback) as Record<string, unknown>;
+  const home = (data.home && typeof data.home === 'object' ? (data.home as Record<string, unknown>) : fallback.home);
+  const about = (data.about && typeof data.about === 'object' ? (data.about as Record<string, unknown>) : fallback.about);
+  const contact = (data.contact && typeof data.contact === 'object' ? (data.contact as Record<string, unknown>) : fallback.contact);
   return {
     id: String(data.id ?? fallback.id),
     portfolioName: String(data.portfolioName ?? fallback.portfolioName),
@@ -446,8 +446,8 @@ function normalizeContent(
       availabilityStatus: String(contact.availabilityStatus ?? fallback.contact.availabilityStatus),
       socials: Array.isArray(contact.socials)
         ? contact.socials.map(item => ({
-            label: String((item as Record<string, unknown>).label ?? ''),
-            url: String((item as Record<string, unknown>).url ?? ''),
+            label: String((item as Record<string, unknown> | null)?.label ?? ''),
+            url: String((item as Record<string, unknown> | null)?.url ?? ''),
           }))
         : fallback.contact.socials,
     },
@@ -456,10 +456,10 @@ function normalizeContent(
 }
 
 function normalizeSettings(
-  raw: Record<string, unknown> | PortfolioSettings,
+  raw: Record<string, unknown> | PortfolioSettings | null | undefined,
   fallback = defaultPortfolioSettings
 ): PortfolioSettings {
-  const data = raw as Record<string, unknown>;
+  const data = (raw && typeof raw === 'object' ? raw : fallback) as Record<string, unknown>;
   return {
     id: String(data.id ?? fallback.id),
     portfolioName: String(data.portfolioName ?? fallback.portfolioName),
@@ -468,8 +468,8 @@ function normalizeSettings(
     availabilityStatus: String(data.availabilityStatus ?? fallback.availabilityStatus),
     socialLinks: Array.isArray(data.socialLinks)
       ? data.socialLinks.map(item => ({
-          label: String((item as Record<string, unknown>).label ?? ''),
-          url: String((item as Record<string, unknown>).url ?? ''),
+          label: String((item as Record<string, unknown> | null)?.label ?? ''),
+          url: String((item as Record<string, unknown> | null)?.url ?? ''),
         }))
       : fallback.socialLinks,
     darkModeDefault: String(data.darkModeDefault ?? fallback.darkModeDefault) as PortfolioSettings['darkModeDefault'],

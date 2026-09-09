@@ -28,7 +28,7 @@ export const About: React.FC<AboutProps> = () => {
                 About
               </h2>
               <p className="max-w-3xl text-sm leading-relaxed text-[#A1A1AA] sm:text-base">
-                {content.about.description}
+                {content?.about?.description || ''}
               </p>
             </div>
 
@@ -36,7 +36,7 @@ export const About: React.FC<AboutProps> = () => {
               <HighlightCard
                 icon={<Code2 className="h-3.5 w-3.5" />}
                 title="Full-stack web"
-                body={content.about.introduction}
+                body={content?.about?.introduction || 'Modern web applications built with TypeScript, React, and clean architecture.'}
               />
               <HighlightCard
                 icon={<Smartphone className="h-3.5 w-3.5" />}
@@ -46,12 +46,12 @@ export const About: React.FC<AboutProps> = () => {
               <HighlightCard
                 icon={<Sparkles className="h-3.5 w-3.5" />}
                 title="Clean execution"
-                body={content.about.otherInfo}
+                body={content?.about?.otherInfo || 'Focus on performance, accessible UI, and seamless user experiences.'}
               />
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-[#0C0C0C]/85 p-5 text-sm leading-relaxed text-zinc-300">
-              {content.about.biography}
+              {content?.about?.biography || ''}
             </div>
           </div>
 
@@ -64,7 +64,7 @@ export const About: React.FC<AboutProps> = () => {
               <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-[#18181B]">
                 <img
                   src={thaboPortrait}
-                  alt={content.portfolioName}
+                  alt={content?.portfolioName || 'Thabo Tshabangu'}
                   referrerPolicy="no-referrer"
                   className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                 />

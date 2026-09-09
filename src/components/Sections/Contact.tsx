@@ -125,23 +125,23 @@ export const Contact: React.FC = () => {
               <div>
                 <p className="mb-1 text-xs uppercase tracking-wider text-[#71717A]">Direct email</p>
                 <a
-                  href={`mailto:${content.contact.email}`}
+                  href={`mailto:${content?.contact?.email || 'thabolanez2@gmail.com'}`}
                   className="inline-flex items-center gap-2 text-lg font-bold text-white transition-colors hover:text-[#A1A1AA] sm:text-xl"
                 >
-                  <span>{content.contact.email}</span>
+                  <span>{content?.contact?.email || 'thabolanez2@gmail.com'}</span>
                   <ArrowUpRight className="h-4 w-4 text-[#71717A]" />
                 </a>
               </div>
 
               <div className="border-t border-white/10 pt-5">
                 <p className="mb-3 text-xs uppercase tracking-wider text-[#71717A]">Phone</p>
-                <p className="text-sm text-white">{content.contact.phone}</p>
+                <p className="text-sm text-white">{content?.contact?.phone || '+27 76 900 0000'}</p>
               </div>
 
               <div className="border-t border-white/10 pt-5">
                 <p className="mb-3 text-xs uppercase tracking-wider text-[#71717A]">Connect</p>
                 <div className="flex flex-wrap gap-3">
-                  {content.contact.socials.map(link => (
+                  {(content?.contact?.socials || []).map(link => (
                     <a
                       key={link.label}
                       href={link.url}

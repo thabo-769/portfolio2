@@ -11,8 +11,9 @@ export const Referrals: React.FC = () => {
 
   const visibleReferrals = useMemo(
     () => {
-      return referrals
-        .filter(referral => !referral.isDeleted)
+      const safe = Array.isArray(referrals) ? referrals.filter(Boolean) : [];
+      return safe
+        .filter(referral => referral && !referral.isDeleted)
         .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
     },
     [referrals]

@@ -15,9 +15,10 @@ export const Hero: React.FC<HeroProps> = ({ onOpenResume }) => {
   const { playSound } = useTheme();
   const { content, settings } = usePortfolioCms();
   const navigate = useNavigate();
-  const displayHeadline = content.home.headline.includes('\n')
-    ? content.home.headline
-    : content.home.headline.replace(/\s+/, '\n');
+  const rawHeadline = content?.home?.headline || 'THABO TSHABANGU';
+  const displayHeadline = rawHeadline.includes('\n')
+    ? rawHeadline
+    : rawHeadline.replace(/\s+/, '\n');
   const headlineCharacters = Array.from(displayHeadline);
   const surnameStart = displayHeadline.indexOf('\n') + 1;
   const [revealedCount, setRevealedCount] = useState(headlineCharacters.length);
@@ -131,12 +132,12 @@ export const Hero: React.FC<HeroProps> = ({ onOpenResume }) => {
         <motion.div style={{ x: headingX, y: headingY }} className="max-w-4xl space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#0C0C0C]/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-zinc-400">
             <span className="h-1.5 w-1.5 rounded-full bg-white" />
-            <span>{settings.availabilityStatus}</span>
+            <span>{settings?.availabilityStatus || 'Available for new opportunities'}</span>
           </div>
 
           <div className="space-y-4">
             <h1
-              aria-label={content.home.headline}
+              aria-label={rawHeadline}
               onClick={handleNameTap}
               className="max-w-5xl cursor-pointer text-4xl font-bold uppercase tracking-tight text-white leading-[0.88] sm:text-5xl md:text-6xl lg:text-7xl"
             >
@@ -157,12 +158,12 @@ export const Hero: React.FC<HeroProps> = ({ onOpenResume }) => {
             </h1>
 
             <p className="text-lg font-medium uppercase tracking-tight text-zinc-400 sm:text-xl md:text-2xl">
-              {content.home.subtitle}
+              {content?.home?.subtitle || 'SOFTWARE DEVELOPER'}
             </p>
           </div>
 
           <p className="max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
-            {content.home.introduction}
+            {content?.home?.introduction || ''}
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-3">
