@@ -58,34 +58,85 @@ function Portfolio() {
   );
 }
 
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Unhandled app error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#000000] p-6 text-center text-white">
+          <div className="max-w-md space-y-4 rounded-3xl border border-white/10 bg-[#0C0C0C] p-8 shadow-2xl">
+            <h1 className="text-2xl font-bold tracking-tight">Something went wrong</h1>
+            <p className="text-xs leading-relaxed text-zinc-400">
+              An unexpected error occurred while rendering the page. Click below to reload.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 rounded-full bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-black transition-colors hover:bg-zinc-200"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function App() {
   useEffect(() => {
     void getFirebaseAnalytics();
   }, []);
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <PortfolioCmsProvider>
-          <ToastProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Portfolio />} />
-                <Route
-                  path="/admin"
-                  element={
-                    <Suspense fallback={<div className="min-h-screen bg-black" />}>
-                      <AdminDashboard />
-                    </Suspense>
-                  }
-                />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </BrowserRouter>
-          </ToastProvider>
-        </PortfolioCmsProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <PortfolioCmsProvider>
+            <ToastProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Portfolio />} />
+                  <Route
+                    path="/admin"
+                    element={
+                      <Suspense
+                        fallback={
+                          <div className="flex min-h-screen items-center justify-center bg-[#000000] text-white">
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="h-7 w-7 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                              <span className="text-xs font-medium text-zinc-400">Loading workspace...</span>
+                            </div>
+                          </div>
+                        }
+                      >
+                        <AdminDashboard />
+                      </Suspense>
+                    }
+                  />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </BrowserRouter>
+            </ToastProvider>
+          </PortfolioCmsProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

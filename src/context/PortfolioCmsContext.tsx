@@ -162,6 +162,23 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const notConfigured = !isFirebaseConfigured();
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setHydrated({
+        projects: true,
+        skills: true,
+        referrals: true,
+        messages: true,
+        media: true,
+        activity: true,
+        analytics: true,
+        content: true,
+        settings: true,
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     fetchGitHubProjects()
       .then(items => {
         setGitHubProjects(items);

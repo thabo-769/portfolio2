@@ -27,7 +27,13 @@ export const AdminDashboard: React.FC = () => {
     import.meta.env.VITE_FREE_DASHBOARD_ACCESS === 'true' || !import.meta.env.VITE_FIREBASE_API_KEY
   );
   const [globalSearch, setGlobalSearch] = useState('');
-  const [unlocked, setUnlocked] = useState(demoMode);
+  const [unlocked, setUnlocked] = useState(demoMode || Boolean(user && isAuthorized));
+
+  useEffect(() => {
+    if (user && isAuthorized) {
+      setUnlocked(true);
+    }
+  }, [user, isAuthorized]);
 
   const unreadCount = useMemo(
     () => messages.filter(message => !message.read && !message.archived).length,
