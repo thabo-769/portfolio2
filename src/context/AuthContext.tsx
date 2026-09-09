@@ -27,6 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isAuthorized, setIsAuthorized] = useState<boolean>(false);
   const isConfigured = isFirebaseConfigured();
   const adminEmails = [
     import.meta.env.VITE_ADMIN_EMAIL?.trim().toLowerCase(),

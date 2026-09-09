@@ -19,7 +19,7 @@ export const SettingsSection: React.FC = () => {
     deleteReferral,
     deleteMessage,
     deleteMedia,
-    permanentlyDeleteProject,
+    deleteProject,
     updateSettings,
     updateContent,
     logActivity,
@@ -98,7 +98,7 @@ export const SettingsSection: React.FC = () => {
 
   const handleResetEverything = async () => {
     for (const project of projects) {
-      await permanentlyDeleteProject(project);
+      await deleteProject(project.id);
     }
     for (const skill of skills) {
       await deleteSkill(skill.id);
