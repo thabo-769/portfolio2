@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Sparkles } from 'lucide-react';
+import { X, Sparkles, Upload, Image as ImageIcon } from 'lucide-react';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
 import { useToast } from './ToastContext';
 import type { Project, ProjectCategory } from '../types';
@@ -20,6 +20,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
   const [technologiesText, setTechnologiesText] = useState(editing?.technologies ? editing.technologies.join(', ') : '');
   const [githubUrl, setGithubUrl] = useState(editing?.githubUrl || '');
   const [liveUrl, setLiveUrl] = useState(editing?.liveUrl || '');
+  const [image, setImage] = useState(editing?.image || '');
   const [featured, setFeatured] = useState<boolean>(editing?.featured ?? true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -46,6 +47,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
         technologies,
         githubUrl: githubUrl.trim(),
         liveUrl: liveUrl.trim(),
+        image: image.trim(),
         featured,
       });
 
@@ -56,6 +58,26 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image file size should be less than 5MB.', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const result = ev.target?.result as string;
+      if (result) {
+        setImage(result);
+        toast('Image attached successfully!', 'success');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -73,7 +95,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
             </div>
             <div>
               <h2 className="text-xl font-bold">{editing ? 'Edit Project' : 'Add New Project'}</h2>
-              <p className="text-xs text-zinc-400">Fill in the details to feature this project on your portfolio.</p>
+              <p className="text-xs text-zinc-400">Fill in the details and attach an image to feature this project.</p>
             </div>
           </div>
 
@@ -86,6 +108,56 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({ editing, onClose }) =>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          {/* Attach Image Section */}
+          <div className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Project Image</span>
+            {image ? (
+              <div className="relative h-44 w-full overflow-hidden rounded-2xl border border-white/10 bg-black/50 group">
+                <img src={image} alt="Project Attachment Preview" className="h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setImage('')}
+                    className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-red-700 transition-colors flex items-center gap-1"
+                  >
+                    <X className="h-3.5 w-3.5" /> Remove Image
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/20 bg-black/40 p-5 text-center transition-all hover:border-white/40 hover:bg-white/5">
+                  <Upload className="h-6 w-6 text-zinc-400 mb-2" />
+                  <span className="text-xs font-semibold text-white">Click to attach image file</span>
+                  <span className="mt-1 text-[10px] text-zinc-500">PNG, JPG, WebP, GIF up to 5MB</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileAttach}
+                  />
+                </label>
+
+                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                  <span className="h-px flex-1 bg-white/10" />
+                  <span>or paste image URL</span>
+                  <span className="h-px flex-1 bg-white/10" />
+                </div>
+
+                <div className="relative">
+                  <ImageIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                  <input
+                    type="url"
+                    value={image}
+                    onChange={e => setImage(e.target.value)}
+                    placeholder="https://example.com/project-image.png"
+                    className="w-full rounded-2xl border border-white/10 bg-black/40 py-2.5 pl-11 pr-4 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-white/30"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           <label className="block space-y-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Project Name *</span>
             <input

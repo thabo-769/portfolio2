@@ -168,6 +168,13 @@ export const ProjectsManager: React.FC = () => {
                     </span>
                   </div>
 
+                  {/* Attached Image Thumbnail */}
+                  {project.image && (
+                    <div className="mb-3 h-32 w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                      <img src={project.image} alt={project.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                    </div>
+                  )}
+
                   {/* Title & Description */}
                   <h3 className="text-lg font-bold tracking-tight text-white group-hover:text-zinc-100">
                     {project.name}
