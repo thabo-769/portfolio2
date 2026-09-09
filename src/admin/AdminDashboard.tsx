@@ -27,11 +27,13 @@ export const AdminDashboard: React.FC = () => {
     import.meta.env.VITE_FREE_DASHBOARD_ACCESS === 'true' || !import.meta.env.VITE_FIREBASE_API_KEY
   );
   const [globalSearch, setGlobalSearch] = useState('');
-  const [unlocked, setUnlocked] = useState(demoMode || Boolean(user && isAuthorized));
+  const [unlocked, setUnlocked] = useState(Boolean(user && isAuthorized));
 
   useEffect(() => {
     if (user && isAuthorized) {
       setUnlocked(true);
+    } else {
+      setUnlocked(false);
     }
   }, [user, isAuthorized]);
 
@@ -207,9 +209,11 @@ function DashboardUnlock({
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-[#0C0C0C] text-white shadow-[0_0_40px_rgba(255,255,255,0.08)]">
           <LockKeyhole className="h-7 w-7" />
         </div>
-        <p className="mt-6 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-[#71717A]">Admin Access Required</p>
-        <h1 className="mt-2 text-center text-3xl font-bold uppercase tracking-tight">Sign in</h1>
-        <p className="mt-2 text-center text-xs leading-relaxed text-[#A1A1AA]">Sign in with your authorized Google account to manage your portfolio.</p>
+        <p className="mt-6 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-[#71717A]">Protected Dashboard</p>
+        <h1 className="mt-2 text-center text-3xl font-bold uppercase tracking-tight">Admin Login</h1>
+        <p className="mt-2 text-center text-xs leading-relaxed text-[#A1A1AA]">
+          Access is strictly restricted. Please sign in with your authorized Google account.
+        </p>
 
         {error && (
           <div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs leading-relaxed text-red-300">
@@ -259,10 +263,6 @@ function DashboardUnlock({
               onSubmit={async event => {
                 event.preventDefault();
                 setError('');
-                if (demoMode) {
-                  onUnlock();
-                  return;
-                }
                 setSubmitting(true);
                 try {
                   await signIn(email.trim(), password);
@@ -307,12 +307,6 @@ function DashboardUnlock({
                 <ArrowLeftRight className="h-3.5 w-3.5" />
               </button>
             </form>
-          )}
-
-          {demoMode && (
-            <p className="pt-2 text-center text-[11px] leading-relaxed text-zinc-500">
-              Demo Mode is enabled locally. Clicking Sign in will unlock the workspace.
-            </p>
           )}
         </div>
       </div>
