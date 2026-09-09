@@ -4,8 +4,6 @@ import { ArrowLeftRight, Chrome, Loader2, LockKeyhole } from 'lucide-react';
 import { DashboardLayout, AdminSection } from './DashboardLayout';
 import { Overview } from './Overview';
 import { ContentSection } from './ContentSection';
-import { ProjectsManager } from './ProjectsManager';
-import { ProjectForm } from './ProjectForm';
 import { MessagesSection } from './MessagesSection';
 import { AnalyticsSection } from './AnalyticsSection';
 import { ActivitySection } from './ActivitySection';
@@ -16,7 +14,6 @@ import { SettingsSection } from './SettingsSection';
 import { usePortfolioCms } from '../context/PortfolioCmsContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './ToastContext';
-import type { Project } from '../types';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -30,8 +27,6 @@ export const AdminDashboard: React.FC = () => {
   );
   const [globalSearch, setGlobalSearch] = useState('');
   const [unlocked, setUnlocked] = useState(demoMode);
-  const [projectFormOpen, setProjectFormOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const unreadCount = useMemo(
     () => messages.filter(message => !message.read && !message.archived).length,
@@ -51,16 +46,6 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const loading = cmsLoading;
-
-  const openAddProject = () => {
-    setEditingProject(null);
-    setProjectFormOpen(true);
-  };
-
-  const openEditProject = (project: Project) => {
-    setEditingProject(project);
-    setProjectFormOpen(true);
-  };
 
   if (loading) {
     return (
@@ -107,8 +92,6 @@ export const AdminDashboard: React.FC = () => {
         return <Overview onNavigate={setSection} />;
       case 'content':
         return <ContentSection />;
-      case 'projects':
-        return <ProjectsManager onAdd={openAddProject} onEdit={openEditProject} />;
       case 'messages':
         return <MessagesSection />;
       case 'remoteDevices':
@@ -162,17 +145,6 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {renderSection()}
-
-      {projectFormOpen && (
-        <ProjectForm
-          key={editingProject?.id ?? 'new-project'}
-          editing={editingProject}
-          onClose={() => {
-            setProjectFormOpen(false);
-            setEditingProject(null);
-          }}
-        />
-      )}
     </DashboardLayout>
   );
 };

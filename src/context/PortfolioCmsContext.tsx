@@ -10,14 +10,10 @@ import {
   getDefaultContent,
   getDefaultSettings,
   getLocalAnalyticsSummary,
-  migrateLocalProjectsToFirebase,
   recordActivity,
   recordAnalyticsEvent,
-  permanentlyDeleteProjectEntry,
-  reorderProjects,
   reorderReferrals,
   reorderSkills,
-  restoreProjectEntry,
   restoreReferralEntry,
   saveReferralEntry,
   saveSkillEntry,
@@ -27,19 +23,14 @@ import {
   subscribeToContent,
   subscribeToMedia,
   subscribeToMessages,
-  subscribeToProjects,
   subscribeToReferrals,
   subscribeToSettings,
   subscribeToSkills,
-  toggleProjectFeatured,
-  toggleProjectStatus,
-  trashProjectEntry,
   updateContentEntry,
   updateSettingsEntry,
   uploadMediaEntry,
-  uploadProjectImageEntry,
-  upsertProject,
 } from '../firebase/cmsService';
+import { fetchGitHubProjects } from '../github/githubService';
 import { isFirebaseConfigured } from '../firebase/config';
 import type {
   ActivityLogEntry,
@@ -78,15 +69,6 @@ interface PortfolioCmsContextValue {
     content: string | null;
     settings: string | null;
   };
-  saveProject: (project: Project, imageUrl?: string) => Promise<string>;
-  migrateLocalProjectsToFirebase: () => Promise<number>;
-  uploadProjectImage: (file: File, projectId: string, onProgress?: (progress: number) => void) => Promise<{ url: string; path: string }>;
-  trashProject: (projectId: string) => Promise<void>;
-  restoreProject: (projectId: string) => Promise<void>;
-  permanentlyDeleteProject: (project: Project) => Promise<void>;
-  reorderProjects: (projectIds: string[]) => Promise<void>;
-  toggleProjectFeatured: (projectId: string, featured: boolean) => Promise<void>;
-  toggleProjectStatus: (projectId: string, status: Project['status']) => Promise<void>;
   saveSkill: (skill: Skill) => Promise<string>;
   deleteSkill: (skillId: string) => Promise<void>;
   reorderSkills: (skillIds: string[]) => Promise<void>;
@@ -143,11 +125,19 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const notConfigured = !isFirebaseConfigured();
 
-  useEffect(() => subscribeToProjects((items, error) => {
-    setProjects(items);
-    setErrors(prev => ({ ...prev, projects: error }));
-    setHydrated(prev => ({ ...prev, projects: true }));
-  }), []);
+  useEffect(() => {
+    fetchGitHubProjects()
+      .then(items => {
+        setProjects(items);
+        setErrors(prev => ({ ...prev, projects: null }));
+      })
+      .catch(error => {
+        setErrors(prev => ({ ...prev, projects: error instanceof Error ? error.message : 'GitHub fetch error' }));
+      })
+      .finally(() => {
+        setHydrated(prev => ({ ...prev, projects: true }));
+      });
+  }, []);
 
   useEffect(() => subscribeToSkills((items, error) => {
     setSkills(items);
@@ -219,44 +209,6 @@ export const PortfolioCmsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       loading,
       notConfigured,
       errors,
-      saveProject: async (project: Project, imageUrl?: string) => {
-        await upsertProject(project, imageUrl, project.imagePath);
-        const nextProject = {
-          ...project,
-          image: imageUrl ?? project.image,
-          ...(project.imagePath ? { imagePath: project.imagePath } : {}),
-        };
-        setProjects(current => {
-          const next = [
-            ...current.filter(item => item.id !== project.id),
-            nextProject,
-          ];
-          return next.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-        });
-        return project.id;
-      },
-      migrateLocalProjectsToFirebase,
-      uploadProjectImage: async (file: File, projectId: string, onProgress?: (progress: number) => void) =>
-        uploadProjectImageEntry(file, projectId, onProgress),
-      trashProject: async (projectId: string) => {
-        await trashProjectEntry(projectId);
-        setProjects(current => current.map(project =>
-          project.id === projectId ? { ...project, isDeleted: true, deletedAt: Date.now(), updatedAt: Date.now() } : project
-        ));
-      },
-      restoreProject: async (projectId: string) => {
-        await restoreProjectEntry(projectId);
-        setProjects(current => current.map(project =>
-          project.id === projectId ? { ...project, isDeleted: false, deletedAt: null, updatedAt: Date.now() } : project
-        ));
-      },
-      permanentlyDeleteProject: async (project: Project) => {
-        await permanentlyDeleteProjectEntry(project);
-        setProjects(current => current.filter(item => item.id !== project.id));
-      },
-      reorderProjects: async (projectIds: string[]) => reorderProjects(projectIds),
-      toggleProjectFeatured: async (projectId: string, featured: boolean) => toggleProjectFeatured(projectId, featured),
-      toggleProjectStatus: async (projectId: string, status: Project['status']) => toggleProjectStatus(projectId, status),
       saveSkill: async (skill: Skill) => saveSkillEntry(skill),
       deleteSkill: async (skillId: string) => deleteSkillEntry(skillId),
       reorderSkills: async (skillIds: string[]) => reorderSkills(skillIds),
